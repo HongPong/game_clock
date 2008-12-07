@@ -156,7 +156,7 @@ function game_clock_state($clock = NULL) {
  */
 function game_clock_init() {
   global $game_clocks;
-  $results = db_query("SELECT * FROM {game_clocks} WHERE status <> 0 AND init <> 0 AND next_tick < %d", time());
+  $results = db_query("SELECT * FROM {game_clocks} WHERE status <> 0 AND increment > 0 AND init <> 0 AND next_tick < %d", time());
   while ($result = db_fetch_object($results)) {
     $game_clocks[$result->name] = $result;
     game_clock_increment($result->name);
@@ -168,7 +168,7 @@ function game_clock_init() {
  */
 function game_clock_cron() {
   global $game_clocks;
-  $results = db_query("SELECT * FROM {game_clocks} WHERE status <> 0 AND next_tick < %d", time());
+  $results = db_query("SELECT * FROM {game_clocks} WHERE status <> 0 AND increment > 0 AND next_tick < %d", time());
   while ($result = db_fetch_object($results)) {
     $game_clocks[$result->name] = $result;
     game_clock_increment($result->name);

@@ -2,4 +2,5 @@
 
 December 2008
 ----------
+ * Add sql check for increment > 0 when automatically incrementing clock (aaron).
  * Create initial module (aaron).
