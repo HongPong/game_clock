@@ -1,0 +1,117 @@
+<?php
+// $Id$
+
+/**
+ *  @file
+ *  The installation file for the Game Clock module.
+ */
+
+/**
+ * Implementation of hook_install().
+ */
+function game_clock_install() {
+  $success = drupal_install_schema('game_clock');
+
+  if ($success) {
+    // Insert a starting record.
+    // Note that UI strings in the following SQL, e.g. "Bookmark this", aren't
+    // wrapped in t() and that's intentional: they are passed to t() later,
+    // thus allowing for multilingual sites.
+    db_query("INSERT INTO {game_clocks} (name, title, increment, block) VALUES ('default', 'Default', 5, 1)");
+  }
+
+  if ($success) {
+    drupal_set_message(st('Game Clock module installed tables successfully.'));
+  }
+  else {
+    drupal_set_message(st('The installation of Game Clock module failed.'), 'error');
+  }
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function game_clock_uninstall() {
+  drupal_uninstall_schema('game_clock');
+  $result = db_query("SELECT name FROM {variable} WHERE name LIKE 'game_clock_%'");
+  while ($row = db_fetch_object($result)) {
+    variable_del($row->name);
+  }
+
+  drupal_set_message(t('Game Clock has been uninstalled.'));
+}
+
+/**
+ * Implementation of hook_schema().
+ */
+function game_clock_schema() {
+  $schema = array();
+
+  $schema['game_clocks'] = array(
+    'fields' => array(
+      'cid' => array(
+        'type' => 'serial',
+        'size' => 'small',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'name' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => FALSE,
+        'default' => '',
+      ),
+      'title' => array(
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => FALSE,
+        'default' => '',
+      ),
+      'status' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'not null' => FALSE,
+        'default' => 0,
+      ),
+      'turn' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-size' => 11,
+      ),
+      'increment' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-size' => 11,
+      ),
+      'next_tick' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'disp-size' => 11,
+      ),
+      'block' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'not null' => FALSE,
+        'default' => 0,
+      ),
+      'init' => array(
+        'type' => 'int',
+        'size' => 'tiny',
+        'not null' => FALSE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('cid'),
+    'unique keys' => array(
+      'name' => array('name')
+    ),
+  );
+
+  return $schema;
+}

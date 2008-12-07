@@ -1,0 +1,242 @@
+<?php
+// $Id$
+
+/**
+ *  @file
+ *  The Game Clock module will increment an official game turn.
+ *  It will activate cron to see whether it's time to increment the turn.
+ *  It will also optionally check on page loads, useful for fast turns on busy sites.
+ */
+
+/**
+ *  Define constant defaults and other variables.
+ */
+define('GAME_CLOCK_INCREMENT_DEFAULT', 5);          // Increment the clock every 5 seconds by default.
+define('GAME_CLOCK_CHECK_ON_INIT_DEFAULT', TRUE);   // If TRUE, then increment the clock on page loads as well as cron.
+define('GAME_CLOCK_PAUSE_DEFAULT', TRUE);           // The Game's default Pause state.
+define('GAME_CLOCK_TURN_DEFAULT', 0);               // What turn to start a game clock on.
+
+/**
+ *  Implements hook_help().
+ */
+function game_clock_help($section) {
+  module_load_include('inc', 'game_clock', 'game_clock.admin');
+  return _game_clock_help($section);
+}
+
+/**
+ *  Pause or start a game clock.
+ *  @param $clock
+ *    The name of the game clock to pause or start.
+ *  @param $status
+ *    If FALSE, then pause the clock, and invoke all hook_game_clock('pause', $game, $state).
+ *    If TRUE, then start the clock, invoke all hook_game_clock('start', $game, $state),
+ *      and increment the clock if needed.
+ */
+function game_clock_pause($clock = 'default', $status = FALSE) {
+  $state = game_clock_state($clock);
+  if ($state['status'] != $status) {
+    global $game_clocks;
+    $game_clocks[$clock]->status = $status;
+    db_query('UPDATE {game_clocks} SET status = %d WHERE cid = %d', $status, $state->cid);
+    module_invoke_all('game_clock', ($status ? 'start' : 'pause'), $clock, $game_clocks[$clock]);
+    game_clock_increment($clock);
+  }
+}
+
+/**
+ *  Start a game clock.
+ *  @param $clock
+ *    The game clock to start. This calls game_clock_pause, which will in effect
+ *    invoke all hook_game_clock('start', $clock, $state) and increment the clock if needed.
+ */
+function game_clock_start($clock = 'default') {
+  game_clock_pause($clock, TRUE);
+}
+
+/**
+ *  This will check to see if the clock needs to be incremented, and increment accordingly.
+ *  If the clock does need to be incremented, then it will also invoke_all hook_game_clock('increment', $clock, $state).
+ *  If the game is paused, it will not increment, even if forced.
+ *  @param $clock
+ *    The game clock to check and increment accordingly.
+ *  @param $force
+ *    If TRUE, then force the clock to increment, regardless of whether it's time yet.
+ *  @return
+ *    Returns either TRUE or FALSE, depending on whether the game clock is incremented.
+ */
+function game_clock_increment($clock = 'default', $force = FALSE) {
+  $state = game_clock_state($clock);
+  // If the clock is paused or doesn't exist, then return.
+  if (!$state->status) {
+    return FALSE;
+  }
+  if (time() >= ($state->next_tick) || $force) {
+    global $game_clocks;
+    $game_clocks[$clock]->turn++;
+    $game_clocks[$clock]->next_tick = time() + $game_clocks[$clock]->increment;
+    db_query("UPDATE {game_clocks} SET turn = %d, next_tick = %d WHERE cid = %d", $game_clocks[$clock]->turn, $game_clocks[$clock]->next_tick, $game_clocks[$clock]->cid);
+    module_invoke_all('game_clock', 'increment', $clock, $game_clocks[$clock]);
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/**
+ *  Reset the turns in a game clock.
+ *  This will invoke_all hook_game_clock('reset', $clock, $state).
+ *  @param $clock
+ *    The game clock to reset.
+ *  @param $turn
+ *    If provided, then reset the game clock to this turn. Otherwise, set it back to GAME_CLOCK_TURN_DEFAULT (which is 0).
+ */
+function game_clock_reset($clock = 'default', $turn = NULL) {
+  global $game_clocks;
+  $state = game_clock_state($clock);
+  $game_clocks[$clock]->turn = isset($turn) ? $turn : GAME_CLOCK_TURN_DEFAULT;
+  $game_clocks[$clock]->next_tick = 0;
+  db_query("UPDATE {game_clocks} SET turn = %d, next_tick = %d WHERE cid = %d", $game_clocks[$clock]->turn, $game_clocks[$clock]->next_tick, $game_clocks[$clock]->cid);
+  module_invoke_all('game_clock', 'reset', $clock, $game_clocks[$clock]);
+  game_clock_increment($clock);
+}
+
+/**
+ *  Create a new game clock.
+ *  @param $state
+ *    An object or array with at least the following neccessary parameters:
+ *    ['name'] => A unique machine name.
+ *    ['title'] => A human readable name for the clock.
+ *    ['increment'] => The number of seconds before incrementing each tick.
+ *    hook_game_clock('create', $state->name, $state); will be invoked if successful.
+ *  @param $report_errors
+ *    If TRUE, then display messages of any errors. In any case, errors will be logged to the watchdog.
+ *  @return
+ *    Either the newly created clock object, or FALSE if there was an error.
+ */
+function game_clock_create($state, $report_errors = FALSE) {
+  module_load_include('inc', 'game_clock', 'game_clock.admin');
+  return _game_clock_create($state, $report_errors);
+}
+
+/**
+ *  Return a game clock state array.
+ *  If the state is empty, a new one will be built.
+ *  @param $clock
+ *    The game clock state to return, as a string. If NULL, then all game clocks will be reloaded.
+ *  @return
+ *    If $clock is NULL, then return all game clock states. Otherwise, just the state asked for.
+ */
+function game_clock_state($clock = NULL) {
+  global $game_clocks;
+
+  if (is_null($game_clocks)) {
+    $game_clocks = array();
+  }
+  if (is_null($clock)) {
+    $game_clocks = array();
+    $results = db_query('SELECT * FROM {game_clocks}');
+    while ($result = db_fetch_object($results)) {
+      $game_clocks[$result->name] = $result;
+    }
+    return $game_clocks;
+  }
+
+  if (is_null($game_clocks[$clock])) {
+    $results = db_query('SELECT * FROM {game_clocks} WHERE name = "%s"', $clock);
+    while ($result = db_fetch_object($results)) {
+      $game_clocks[$result->name] = $result;
+    }
+  }
+
+  return $game_clocks[$clock];
+}
+
+/**
+ *  Implements hook_init().
+ */
+function game_clock_init() {
+  global $game_clocks;
+  $results = db_query("SELECT * FROM {game_clocks} WHERE status <> 0 AND init <> 0 AND next_tick < %d", time());
+  while ($result = db_fetch_object($results)) {
+    $game_clocks[$result->name] = $result;
+    game_clock_increment($result->name);
+  }
+}
+
+/**
+ *  Implements hook_cron().
+ */
+function game_clock_cron() {
+  global $game_clocks;
+  $results = db_query("SELECT * FROM {game_clocks} WHERE status <> 0 AND next_tick < %d", time());
+  while ($result = db_fetch_object($results)) {
+    $game_clocks[$result->name] = $result;
+    game_clock_increment($result->name);
+  }
+}
+
+/**
+ *  Implements hook_menu().
+ */
+function game_clock_menu() {
+  $items = array(
+    'admin/settings/game_clock' => array(
+      'title' => 'Game clock',
+      'description' => 'Administer the game clock.',
+      'page callback' => 'game_clock_settings_page',
+      'access arguments' => array('administer game clock'),
+      'file' => 'game_clock.admin.inc',
+    ),
+  );
+  return $items;
+}
+
+/**
+ *  Implements hook_perm().
+ */
+function game_clock_perm() {
+  return array('administer game clock');
+}
+
+/**
+ *  Implements hook_block().
+ */
+function game_clock_block($op = 'list', $delta = 'default', $edit = array()) {
+  switch ($op) {
+    case 'list':
+      $blocks = array();
+      foreach (game_clock_state() as $game => $state) {
+        // Only make a block available if it's been checked on the game clock administration page.
+        if ($state->block) {
+          $blocks[$game] = array(
+            'info' => t('Game clock: @title', array('@title' => $state->title)),
+          );
+        }
+      }
+      return $blocks;
+    case 'view':
+      $state = game_clock_state($delta);
+      $block = array(
+        'subject' => t('@title game clock', array('@title' => $state->title)),
+        'content' => theme('game_clock_block', $delta),
+      );
+      return $block;
+  }
+}
+
+/**
+ *  Implements hook_theme().
+ */
+function game_clock_theme($existing, $type, $theme, $path) {
+  return array(
+    'game_clock_block' => array(
+      'arguments' => array('clock' => 'default'),
+      'file' => 'game_clock.theme.inc',
+    ),
+    'game_clock_settings_form' => array(
+      'arguments' => array('form' => NULL),
+      'file' => 'game_clock.admin.inc',
+    ),
+  );
+}
+
