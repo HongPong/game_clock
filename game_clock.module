@@ -3,7 +3,8 @@
 
 /**
  *  @file
- *  The Game Clock module will increment an official game turn.
+ *  The Game Clock module will increment the turn on a game clock,
+ *  and handle multiple clocks, with different incrementation rates.
  *  It will activate cron to see whether it's time to increment the turn.
  *  It will also optionally check on page loads, useful for fast turns on busy sites.
  */
@@ -63,23 +64,45 @@ function game_clock_start($clock = 'default') {
  *  @param $force
  *    If TRUE, then force the clock to increment, regardless of whether it's time yet.
  *  @return
- *    Returns either TRUE or FALSE, depending on whether the game clock is incremented.
+ *    Returns the number of ticks the clock incremented, or 0 if it wasn't incremented.
  */
 function game_clock_increment($clock = 'default', $force = FALSE) {
   $state = game_clock_state($clock);
   // If the clock is paused or doesn't exist, then return.
   if (!$state->status) {
-    return FALSE;
+    return 0;
   }
-  if (time() >= ($state->next_tick) || $force) {
+
+  // If it's time for the next tick, or if we're manually incrementing the clock, then increment.
+  if (($state->increment && (time() >= ($state->next_tick))) || $force) {
     global $game_clocks;
-    $game_clocks[$clock]->turn++;
-    $game_clocks[$clock]->next_tick = time() + $game_clocks[$clock]->increment;
+
+    // If the clock has run in the past, then figure out how many turns we've missed.
+    // This ensures the clock represents the correct tick.
+    $game_clocks[$clock]->ticks = ($game_clocks[$clock]->next_tick ? floor((time() - $game_clocks[$clock]->next_tick) / $game_clocks[$clock]->increment) : 0) + 1;
+
+    // Increment the clock by the number of turns missed, plus 1 for the next turn.
+    $game_clocks[$clock]->turn += $game_clocks[$clock]->ticks;
+
+    if ($game_clocks[$clock]->increment) {
+      // Record the next turn that we should increment the clock.
+      $game_clocks[$clock]->next_tick = time() + $game_clocks[$clock]->increment;
+    }
+
+    // Store the clock state to the database. Note that we don't store the ->ticks,
+    // but they'll be passed to the modules in the next step.
     db_query("UPDATE {game_clocks} SET turn = %d, next_tick = %d WHERE cid = %d", $game_clocks[$clock]->turn, $game_clocks[$clock]->next_tick, $game_clocks[$clock]->cid);
+
+    // Invoke hook_game_clock('increment'). Note that we pass ->ticks, so the modules know how many
+    // ticks have actually passed, rather than necessarily incrementing for every tick.
     module_invoke_all('game_clock', 'increment', $clock, $game_clocks[$clock]);
-    return TRUE;
+
+    // The clock incremented. Return the number of ticks incremented.
+    return $game_clocks[$clock]->ticks;
   }
-  return FALSE;
+
+  // The clock was not incremented.
+  return 0;
 }
 
 /**
@@ -116,6 +139,22 @@ function game_clock_reset($clock = 'default', $turn = NULL) {
 function game_clock_create($state, $report_errors = FALSE) {
   module_load_include('inc', 'game_clock', 'game_clock.admin');
   return _game_clock_create($state, $report_errors);
+}
+
+/**
+ *  Delete a game clock.
+ *  This will also invoke hook_game_clock('delete', $state->name, $state),
+ *  after it's been deleted from the database and wiped from the global variable.
+ *  @param $clock
+ *    The string of the clock.
+ *  @param $report_errors
+ *    If TRUE, then display messages of any errors. In any case, errors will be logged to the watchdog.
+ *  @return
+ *    TRUE if succeeded; otherwise, FALSE.
+ */
+function game_clock_delete($clock, $report_errors = FALSE) {
+  module_load_include('inc', 'game_clock', 'game_clock.admin');
+  return _game_clock_delete($state, $report_errors);
 }
 
 /**
@@ -156,7 +195,7 @@ function game_clock_state($clock = NULL) {
  */
 function game_clock_init() {
   global $game_clocks;
-  $results = db_query("SELECT * FROM {game_clocks} WHERE status <> 0 AND init <> 0 AND next_tick < %d", time());
+  $results = db_query("SELECT * FROM {game_clocks} WHERE status <> 0 AND increment > 0 AND init <> 0 AND next_tick < %d", time());
   while ($result = db_fetch_object($results)) {
     $game_clocks[$result->name] = $result;
     game_clock_increment($result->name);
@@ -168,7 +207,7 @@ function game_clock_init() {
  */
 function game_clock_cron() {
   global $game_clocks;
-  $results = db_query("SELECT * FROM {game_clocks} WHERE status <> 0 AND next_tick < %d", time());
+  $results = db_query("SELECT * FROM {game_clocks} WHERE status <> 0 AND increment > 0 AND next_tick < %d", time());
   while ($result = db_fetch_object($results)) {
     $game_clocks[$result->name] = $result;
     game_clock_increment($result->name);

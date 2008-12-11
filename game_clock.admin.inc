@@ -273,7 +273,7 @@ function _game_clock_selections($increment = NULL) {
  */
 function _game_clock_create($state, $report_errors = FALSE) {
   $state = (object) $state;
-  if (is_null($state->name)) {
+  if (is_null($state->name) || ("{$state->name}" === '')) {
     $error = 'Tried to create unnamed game clock.';
     if ($report_errors) {
       drupal_set_message(t($error), 'error');
@@ -294,15 +294,57 @@ function _game_clock_create($state, $report_errors = FALSE) {
   $status = db_query("INSERT INTO {game_clocks} (name, title, status, turn, increment, block, init) VALUES ('%s', '%s', %d, %d, %d, %d, %d)", $state->name, $state->title, $state->status, $state->turn, $state->increment, $state->block, $state->init);
   if (!$status) {
     $error = 'Creation of the %clock game clock failed for an unknown reason.';
+    $options = array('%clock' => $state->title);
     if ($report_errors) {
-      drupal_set_message($error, 'error');
+      drupal_set_message(t($error, $options), 'error');
     }
-    watchdog('game_clock', $error, array(), WATCHDOG_ERROR);
+    watchdog('game_clock', $error, $options, WATCHDOG_ERROR);
     return FALSE;
   }
   $state = game_clock_state($state->name);
   module_invoke_all('game_clock', 'create', $state->name, $state);
+  $message = 'Created %title game clock.';
+  $options = array('%title' => $state->title);
+  watchdog('game_clock', $message, $options, WATCHDOG_NOTICE, l(t('@name', array('@name' => $state->title)), 'admin/settings/game_clock/'. $state->name));
+  if ($report_errors) {
+    drupal_set_message(t($message, $options));
+  }
   return $state;
+}
+
+/**
+ *  Delete a game clock.
+ *  This will also invoke hook_game_clock('delete', $state->name, $state),
+ *  after it's been deleted from the database and wiped from the global variable.
+ *  @param $clock
+ *    The string of the clock.
+ *  @param $report_errors
+ *    If TRUE, then display messages of any errors. In any case, errors will be logged to the watchdog.
+ *  @return
+ *    TRUE if succeeded; otherwise, FALSE.
+ */
+function _game_clock_delete($clock, $report_errors = FALSE) {
+  $state = game_clock_state($clock);
+  if (!$state->cid) {
+    $error = "Tried to delete non-existant game clock: %clock";
+    $options = array('%clock' => $clock);
+    if ($report_errors) {
+      drupal_set_message(t($error, $options), 'error');
+    }
+    watchdog('game_clock', $error, $options, WATCHDOG_ERROR);
+    return FALSE;
+  }
+  db_query("DELETE FROM {game_clocks} WHERE cid = %d", $state->cid);
+  global $game_clocks;
+  unset($game_clocks[$state->name]);
+  module_invoke_all('game_clock', 'delete', $state->name, $state);
+  $message = 'Deleted %title game clock.';
+  $options = array('%title' => $state->title);
+  watchdog('game_clock', $message, $options, WATCHDOG_NOTICE);
+  if ($report_errors) {
+    drupal_set_message(t($message, $options));
+  }
+  return TRUE;
 }
 
 /**

@@ -2,4 +2,6 @@
 
 December 2008
 ----------
+ * Ensure we account for all missed ticks when incrementing (aaron).
+ * Add hook_delete (aaron).
  * Create initial module (aaron).
