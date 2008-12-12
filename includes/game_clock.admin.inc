@@ -34,11 +34,14 @@ function _game_clock_help($section) {
 </pre>
         <p>Other available functions in the Game Clock API that may be useful:</p>
 <pre>
+  game_clock_state(\$clock = NULL);
   game_clock_pause(\$clock = 'default', \$status = FALSE);
   game_clock_start(\$clock = 'default');
   game_clock_increment(\$clock = 'default', \$force = FALSE);
   game_clock_reset(\$clock = 'default', \$turn = NULL);
-  game_clock_state(\$clock = NULL);
+  game_clock_create(\$state, \$report_errors = FALSE)
+  game_clock_save(\$clock, \$report_errors = FALSE);
+  game_clock_delete(\$clock, \$report_errors = FALSE);
 </pre>
         <p>Additionally, you may create a hook_game_clock function in your module to act on game clock events, as follows:</p>
 <pre>
@@ -57,7 +60,13 @@ function _game_clock_help($section) {
         // The clock named \$clock has just been incremented a tick.
         break;
       case 'reset':
-        // The clock named \$clock has just been reset (usually to 0).
+        // The clock named \$clock has just been reset to 0 turns.
+        break;
+      case 'save':
+        // The clock named \$clock has just been edited and saved.
+        break;
+      case 'delete':
+        // The clock named \$clock has just been deleted.
         break;
     }
   }
@@ -72,7 +81,11 @@ function _game_clock_help($section) {
  */
 function game_clock_settings_page() {
   $output .= drupal_get_form('game_clock_settings_form');
-  $output .= drupal_get_form('game_clock_form');
+  global $game_clock_settings_page_standard_form;
+  if ($game_clock_settings_page_standard_form) {
+    $output .= drupal_get_form('game_clock_form');
+    $output .= variable_get('game_clock_settings_form_count', 50) ? theme('pager') : '';
+  }
   return $output;
 }
 
@@ -89,7 +102,36 @@ function game_clock_settings_form($form_state) {
     return game_clock_delete_form($form_state, $items);
   }
 
+  // We are printing the standard form. That means we get an add form and pager.
+  global $game_clock_settings_page_standard_form;
+  $game_clock_settings_page_standard_form = TRUE;
+
+  $game_clocks = array();
+  $header = array(
+    theme('table_select_header_cell'),
+    array('data' => t('Title'), 'field' => 'title', 'sort' => 'asc'),
+    array('data' => t('Status'), 'field' => 'status'),
+    array('data' => t('Turn'), 'field' => 'turn'),
+    array('data' => t('Increment'), 'field' => 'increment'),
+    array('data' => t('Page load'), 'field' => 'init'),
+    t('Ops'));
+  $sql = "SELECT * FROM {game_clocks}";
+  $sql .= tablesort_sql($header);
+  if (variable_get('game_clock_settings_form_count', 50)) {
+    $results = pager_query($sql, variable_get('game_clock_settings_form_count', 50));
+  }
+  else {
+    $results = db_query($sql);
+  }
+  while ($clock = db_fetch_object($results)) {
+    $game_clocks[$clock->name] = $clock;
+  }
+
   $form = array();
+  $form['table_header'] = array(
+    '#type' => 'value',
+    '#value' => $header,
+  );
   $options = array(
     'pause' => t('Pause game clocks'),
     'start' => t('Start game clocks'),
@@ -102,7 +144,6 @@ function game_clock_settings_form($form_state) {
     '#options' => $options,
   );
   $form['#theme'] = 'game_clock_settings_form';
-  $game_clocks = game_clock_state();
   $form['game_clocks'] = array(
     '#type' => 'value',
     '#value' => $game_clocks,
@@ -252,7 +293,7 @@ function game_clock_start_page($clock) {
 }
 
 /**
- *
+ *  Define the form to create a new game clock.
  */
 function game_clock_form($form_state, $clock = NULL) {
   $clock = (object) $clock;
@@ -260,8 +301,8 @@ function game_clock_form($form_state, $clock = NULL) {
   $form['clock'] = array(
     '#type' => 'fieldset',
     '#title' => !isset($clock->cid) ? t('Create new game clock') : t('Game clock'),
-    '#collapsible' => !isset($clock->cid),
-    '#collapsed' => !isset($clock->cid),
+    '#collapsible' => !isset($clock->cid) && (arg(3) != 'add'),
+    '#collapsed' => !isset($clock->cid) && (arg(3) != 'add'),
     '#description' => t('Game clocks can be useful for tracking game turns, special effects, and the like. You can also create clocks programmatically. See the !help page for more information.', array('!help' => l('game clock help', 'admin/help/game_clock'))),
   );
   $form['clock']['name'] = array(
@@ -293,7 +334,7 @@ function game_clock_form($form_state, $clock = NULL) {
   $form['clock']['increment'] = array(
     '#type' => 'select',
     '#options' => _game_clock_selections(),
-    '#default_value' => isset($clock->increment) ? $clock->increment : GAME_CLOCK_INCREMENT_DEFAULT,
+    '#default_value' => isset($clock->increment) ? $clock->increment : variable_get('game_clock_increment_default', 5),
     '#required' => TRUE,
     '#description' => t('The clock will wait at least this much time before incrementing to the next tick.'),
   );
@@ -318,6 +359,40 @@ function game_clock_form($form_state, $clock = NULL) {
     '#value' => $clock->cid,
   );
   return $form;
+}
+
+function game_clock_configure_form() {
+  $options = array(0 => 'All', 1 => 1, 5 => 5, 10 => 10, 25 => 25, 50 => 50, 100 => 100, 250 => 250, 500 => 500, 1000 => 1000);
+  $form = array();
+  $form['game_clock_settings_form_count'] = array(
+    '#type' => 'selector',
+    '#title' => t('Settings listing form clock count'),
+    '#description' => t('This displays how many clocks to display on the game clock settings listing form page.'),
+    '#options' => $options,
+    '#default_value' => variable_get('game_clock_settings_form_count', 50),
+  );
+  $form['game_clock_increment_default'] = array(
+    '#type' => 'selector',
+    '#title' => t('Increment default'),
+    '#description' => t('This determines the default increment value for a newly created clock. This value may easily be set when creating clocks, and is simply provided as a convenience for administrators and developers who need to create a large number of similar clocks.'),
+    '#options' => _game_clock_selections(),
+    '#default_value' => variable_get('game_clock_increment_default', 5),
+  );
+  $form['game_clock_limit_on_init'] = array(
+    '#type' => 'selector',
+    '#title' => t('Page load limit'),
+    '#description' => t('This limits how many clocks to process during a single page load. Set it if you have a high volume of game clocks and have pages timing out.'),
+    '#options' => $options,
+    '#default_value' => variable_get('game_clock_limit_on_init', 0),
+  );
+  $form['game_clock_limit_on_cron'] = array(
+    '#type' => 'selector',
+    '#title' => t('Cron limit'),
+    '#description' => t('This limits how many clocks to process during each cron run. Set it if you have a high volume of game clocks that never seem to run.'),
+    '#options' => $options,
+    '#default_value' => variable_get('game_clock_limit_on_cron', 0),
+  );
+  return system_settings_form($form);
 }
 
 /**
@@ -558,6 +633,9 @@ function _game_clock_save($state, $report_errors = FALSE) {
         game_clock_report_error($error, $options, $report_errors, 'error', $link);
         return FALSE;
       }
+      global $game_clocks;
+      $game_clocks[$state->name] = $state;
+      module_invoke_all('game_clock', 'save', $state->name, $state);
       return $state;
     }
   }
@@ -596,8 +674,7 @@ function game_clock_report_error($message, $options = array(), $report_errors = 
  */
 function theme_game_clock_settings_form($form) {
   $output .= drupal_render($form['selector']);
-  $select_header = theme('table_select_header_cell');
-  $header = array($select_header, t('Title'), t('Status'), t('Turn'), t('Increment'), t('Page load'), t('Ops'));
+  $header = $form['table_header']['#value'];
   $rows = array();
   foreach ($form['game_clocks']['#value'] as $clock => $state) {
     $cells = array();

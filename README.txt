@@ -35,16 +35,19 @@ To do so, you would create a game clock array as follows:
 
 Other available functions in the Game Clock API that may be useful:
 
+  game_clock_state($clock = NULL);
   game_clock_pause($clock = 'default', $status = FALSE);
   game_clock_start($clock = 'default');
   game_clock_increment($clock = 'default', $force = FALSE);
   game_clock_reset($clock = 'default', $turn = NULL);
-  game_clock_state($clock = NULL);
+  game_clock_create($state, $report_errors = FALSE)
+  game_clock_save($clock, $report_errors = FALSE);
+  game_clock_delete($clock, $report_errors = FALSE);
 
 Additionally, you may create a hook_game_clock function in your module to act
 on game clock events, as follows:
 
-  function hook_game_clock($op, $clock = 'default', $state = NULL) {
+function hook_game_clock($op, $clock = 'default', $state = NULL) {
     switch ($op) {
       case 'create':
         // A clock named $clock has been created with $state.
@@ -59,7 +62,13 @@ on game clock events, as follows:
         // The clock named $clock has just been incremented a tick.
         break;
       case 'reset':
-        // The clock named $clock has just been reset (usually to 0).
+        // The clock named $clock has just been reset to 0 turns.
+        break;
+      case 'save':
+        // The clock named $clock has just been edited and saved.
+        break;
+      case 'delete':
+        // The clock named $clock has just been deleted.
         break;
     }
   }

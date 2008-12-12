@@ -2,6 +2,13 @@
 
 December 2008
 ----------
+ * Change constants to variable_gets (aaron).
+ * Add documentation for save hook (aaron).
+ * Invoke save $op for hook_game_clock (aaron).
+ * Ensure game clock state is stored to global on save (aaron).
+ * Add variable configuration to settings page (aaron).
+ * Allow table sort & pager on game clock listings (aaron).
+ * Add tabs for list/add/settings to admin pages (aaron).
  * Allow deletion of multiple game clocks (aaron).
  * Add selection options to increment (aaron).
  * Change initial values of 'default' clock (aaron).
