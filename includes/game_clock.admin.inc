@@ -101,6 +101,14 @@ function game_clock_settings_form($form_state) {
     }
     return game_clock_delete_form($form_state, $items);
   }
+  else if (isset($form_state['values']['selector']) && $form_state['values']['selector'] == 'reset') {
+    foreach ($form_state['values']['clocks'] as $clock => $selected) {
+      if ($selected['selection']) {
+        $items[$clock] = $form_state['values']['game_clocks'][$clock];
+      }
+    }
+    return game_clock_reset_form($form_state, $items);
+  }
 
   // We are printing the standard form. That means we get an add form and pager.
   global $game_clock_settings_page_standard_form;
@@ -263,11 +271,48 @@ function game_clock_delete_form_submit($form, &$form_state) {
   $form_state['redirect'] = 'admin/settings/game_clock';
 }
 
+function game_clock_reset_form(&$form_state, $clocks) {
+  if (is_object($clocks)) {
+    $title = t('Are you sure you wish to reset the %clock game clock?', array('%clock' => $clocks->title));
+    $message = t('If you press %reset, then the %clock game clock will be reset to 0 turns, which may not be undone.', array('%reset' => t('Reset'), '%clock' => $clocks->title));
+    $clocks = array($clocks->name => $clocks);
+  }
+  else if (is_array($clocks) && !empty($clocks)) {
+    $title = t('Are you sure you wish to reset these game clocks?');
+    $message = t('If you press %reset, then the following game clocks will be reset to 0 turns:', array('%reset' => t('Reset')));
+    $items = array();
+    foreach ($clocks as $state) {
+      $items[] = t('%clock', array('%clock' => $state->title));
+    }
+    $message .= theme('item_list', $items);
+    $message .= t('This action may not be undone.');
+  }
+  else {
+    drupal_not_found();
+  }
+  $form['clocks'] = array(
+    '#type' => 'value',
+    '#value' => $clocks,
+  );
+  $form['#submit'][] = 'game_clock_reset_form_submit';
+  return confirm_form($form, $title, 'admin/settings/game_clock', $message, t('Reset'));
+}
+
+function game_clock_reset_form_submit($form, &$form_state) {
+  foreach ($form_state['values']['clocks'] as $clock => $state) {
+    game_clock_reset($clock);
+  }
+  $form_state['redirect'] = 'admin/settings/game_clock';
+}
+
 /**
  *  Callback for admin/settings/game_clock/%game_clock.
  *  This displays the edit game clock form.
  */
 function game_clock_edit_page($clock) {
+  if (!$clock->cid) {
+    drupal_not_found();
+  }
   drupal_set_title(t('Edit @clock', array('@clock' => $clock->title)));
   return drupal_get_form('game_clock_form', $clock);
 }
