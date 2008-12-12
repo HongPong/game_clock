@@ -2,6 +2,19 @@
 
 December 2008
 ----------
+ * Add title to increment on add clock form (aaron).
+ * Change 'selector' to 'select' on settings form #types (aaron).
+ * Remove extra : on 'With selected clocks:' (aaron).
+ * Rebuild menus on .install update (aaron).
+ * Change menu callback for settings pages (aaron).
+ * Move help page to game_clock.help.inc (aaron).
+ * Move API helper functions to game_clock.inc (aaron).
+ * Add documentation for game clock type (aaron).
+ * Save type on create & edit (aaron).
+ * Add type table header & column (aaron).
+ * Create update function for .install to add type to db (aaron).
+ * Add type to game clocks (aaron).
+ * Consolidate error messages (aaron).
  * Create release (aaron).
  * Implement reset callback (aaron).
  * Change constants to variable_gets (aaron).

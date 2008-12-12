@@ -14,8 +14,16 @@
  *  Implements hook_help().
  */
 function game_clock_help($section) {
-  module_load_include('inc', 'game_clock', 'includes/game_clock.admin');
-  return _game_clock_help($section);
+  switch ($section) {
+    case 'admin/settings/game_clock':
+      return t("
+        <p>Game clocks may be used for various purposes, such as keeping an in-game calendar, tracking game effects and events, and limiting characters to acting at a slower pace suitable for a web-based game.</p>
+        <p>You may view all active game clocks from this page, as well as create new clocks below. Additionally, you can create new game clocks programmatically with the API provided with the Game Clock module. See the !help page for more information.</p>
+", array('!help' => l(t('Game Clock help'), 'admin/help/game_clock')));
+    case 'admin/help#game_clock':
+      module_load_include('inc', 'game_clock', 'includes/game_clock.help');
+      return _game_clock_help($section);
+  }
 }
 
 /**
@@ -139,7 +147,7 @@ function game_clock_reset($clock = 'default', $turn = NULL) {
  *    Either the newly created clock object, or FALSE if there was an error.
  */
 function game_clock_create($state, $report_errors = FALSE) {
-  module_load_include('inc', 'game_clock', 'includes/game_clock.admin');
+  module_load_include('inc', 'game_clock', 'includes/game_clock');
   return _game_clock_create($state, $report_errors);
 }
 
@@ -157,7 +165,7 @@ function game_clock_create($state, $report_errors = FALSE) {
  *    TRUE if succeeded; otherwise, FALSE.
  */
 function game_clock_delete($clock, $report_errors = FALSE) {
-  module_load_include('inc', 'game_clock', 'includes/game_clock.admin');
+  module_load_include('inc', 'game_clock', 'includes/game_clock');
   return _game_clock_delete($clock, $report_errors);
 }
 
@@ -174,7 +182,7 @@ function game_clock_delete($clock, $report_errors = FALSE) {
  *    The new state if succeeded; otherwise, FALSE.
  */
 function game_clock_save($state, $report_errors = FALSE) {
-  module_load_include('inc', 'game_clock', 'includes/game_clock.admin');
+  module_load_include('inc', 'game_clock', 'includes/game_clock');
   return _game_clock_save($state, $report_errors);
 }
 

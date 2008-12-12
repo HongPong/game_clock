@@ -61,6 +61,12 @@ function game_clock_schema() {
         'not null' => FALSE,
         'default' => '',
       ),
+      'type' => array(
+        'type' => 'varchar',
+        'length' => '32',
+        'not null' => FALSE,
+        'default' => '',
+      ),
       'title' => array(
         'type' => 'varchar',
         'length' => '255',
@@ -114,4 +120,18 @@ function game_clock_schema() {
   );
 
   return $schema;
+}
+
+/**
+ *  Add the 'type' field to game clocks.
+ */
+function game_clock_update_6001() {
+  db_add_field($ret, 'game_clocks', 'type', array(
+      'type' => 'varchar',
+      'length' => '32',
+      'not null' => FALSE,
+      'default' => '',
+    ));
+  menu_rebuild();
+  return $ret;
 }

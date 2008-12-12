@@ -17,6 +17,8 @@ To do so, you would create a game clock array as follows:
   $game = array(
     'name' => $name,           // A unique machine-name.
     'title' => $title,         // A human-readable title.
+    'type' => $type,           // An optional string. Some modules may act only
+                               // on events by clocks of a certain type.
     'status' => $status,       // If TRUE, then the clock will begin started.
                                // If FALSE it begins paused. Defaults to FALSE.
     'turn' => $turn,           // The current turn to begin the clock.
@@ -45,7 +47,8 @@ Other available functions in the Game Clock API that may be useful:
   game_clock_delete($clock, $report_errors = FALSE);
 
 Additionally, you may create a hook_game_clock function in your module to act
-on game clock events, as follows:
+on game clock events, as follows, noting that \$state will be an object, rather
+than an array::
 
 function hook_game_clock($op, $clock = 'default', $state = NULL) {
     switch ($op) {
@@ -73,4 +76,5 @@ function hook_game_clock($op, $clock = 'default', $state = NULL) {
     }
   }
 
-Please read the documentation in the game_clock.module file for more information.
+Please read the documentation in the game_clock.module file for more
+information.
