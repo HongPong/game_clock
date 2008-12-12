@@ -14,10 +14,10 @@ function game_clock_install() {
 
   if ($success) {
     // Insert a starting record.
-    // Note that UI strings in the following SQL, e.g. "Bookmark this", aren't
+    // Note that UI strings in the following SQL, e.g. "Default", aren't
     // wrapped in t() and that's intentional: they are passed to t() later,
     // thus allowing for multilingual sites.
-    db_query("INSERT INTO {game_clocks} (name, title, increment, block) VALUES ('default', 'Default', 5, 1)");
+    db_query("INSERT INTO {game_clocks} (name, title, increment, block, init) VALUES ('default', 'Default', 15, 1, 1)");
   }
 
   if ($success) {

@@ -67,20 +67,32 @@ function _game_clock_help($section) {
   }
 }
 
+/**
+ *  Callback for admin/settings/game_clock.
+ */
 function game_clock_settings_page() {
   $output .= drupal_get_form('game_clock_settings_form');
-  $output .= drupal_get_form('game_clock_settings_add_form');
+  $output .= drupal_get_form('game_clock_form');
   return $output;
 }
 
 /**
- *  Callback for admin/settings/game_clock.
+ *  Listing of game clocks on top of the admin/settings/game_clock page.
  */
-function game_clock_settings_form() {
+function game_clock_settings_form($form_state) {
+  if (isset($form_state['values']['selector']) && $form_state['values']['selector'] == 'delete') {
+    foreach ($form_state['values']['clocks'] as $clock => $selected) {
+      if ($selected['selection']) {
+        $items[$clock] = $form_state['values']['game_clocks'][$clock];
+      }
+    }
+    return game_clock_delete_form($form_state, $items);
+  }
+
   $form = array();
   $options = array(
     'pause' => t('Pause game clocks'),
-    'run' => t('Run game clocks'),
+    'start' => t('Start game clocks'),
     'reset' => t('Reset game clocks'),
     'delete' => t('Delete game clocks'),
   );
@@ -89,15 +101,14 @@ function game_clock_settings_form() {
     '#title' => t('With selected game clocks:'),
     '#options' => $options,
   );
-  $form['submit'] = array(
-    '#type' => 'submit',
-    '#value' => t('Submit'),
-  );
   $form['#theme'] = 'game_clock_settings_form';
   $game_clocks = game_clock_state();
   $form['game_clocks'] = array(
     '#type' => 'value',
     '#value' => $game_clocks,
+  );
+  $form['clocks'] = array(
+    '#tree' => TRUE,
   );
   foreach ($game_clocks as $clock => $state) {
     $form['clocks'][$clock] = array();
@@ -106,7 +117,7 @@ function game_clock_settings_form() {
     );
     $form['clocks'][$clock]['title'] = array(
       '#type' => 'item',
-      '#value' => t('@title (@clock)', array('@title' => $state->title, '@clock' => $clock)),
+      '#value' => l(t('@title', array('@title' => $state->title)), 'admin/settings/game_clock/'. $clock),
     );
     $form['clocks'][$clock]['state'] = array(
       '#type' => 'item',
@@ -127,7 +138,7 @@ function game_clock_settings_form() {
     $ops = array(
       l(t('edit'), 'admin/settings/game_clock/'. $clock),
       l(t('pause'), 'admin/settings/game_clock/'. $clock .'/pause'),
-      l(t('run'), 'admin/settings/game_clock/'. $clock .'/run'),
+      l(t('start'), 'admin/settings/game_clock/'. $clock .'/start'),
       l(t('reset'), 'admin/settings/game_clock/'. $clock .'/reset'),
       l(t('delete'), 'admin/settings/game_clock/'. $clock .'/delete'),
     );
@@ -135,69 +146,185 @@ function game_clock_settings_form() {
       '#type' => 'item',
       '#value' => implode(', ', $ops),
     );
+    $form['help'] = array(
+      '#type' => 'item',
+      '#value' => t('If a game clock has been started, it will increment a turn every time the increment time passes. If %init is set to Yes, then the clock will check for incrementation as appropriate on user page loads. Otherwise, it will check only during the cron run.', array('%init' => t('Page load'))),
+    );
+    $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit'),
+  );
+
   }
   return $form;
 }
 
-function game_clock_settings_add_form() {
+function game_clock_settings_form_submit($form, &$form_state) {
+  $clocks = array();
+  foreach ($form_state['values']['clocks'] as $clock => $value) {
+    if ($value['selection']) {
+      $clocks[] = $clock;
+    }
+  }
+  if (!empty($clocks)) {
+    switch ($form_state['values']['selector']) {
+      case 'delete':
+      case 'reset':
+        $form_state['rebuild'] = TRUE;
+        break;
+      case 'pause':
+        foreach ($clocks as $clock) {
+          game_clock_pause($clock);
+          drupal_set_message(t("Paused the %clock game clock.", array('%clock' => $form_state['values']['game_clocks'][$clock]->title)));
+        }
+        break;
+      case 'start':
+        foreach ($clocks as $clock) {
+          game_clock_start($clock);
+          drupal_set_message(t("Started the %clock game clock.", array('%clock' => $form_state['values']['game_clocks'][$clock]->title)));
+        }
+        break;
+    }
+  }
+}
+
+function game_clock_delete_form(&$form_state, $clocks) {
+  if (is_object($clocks)) {
+    $title = t('Are you sure you wish to delete the %clock game clock?', array('%clock' => $clocks->title));
+    $message = t('If you press %delete, then the %clock game clock will be deleted, and may not be recovered.', array('%delete' => t('Delete'), '%clock' => $clocks->title));
+    $clocks = array($clocks->name => $clocks);
+  }
+  else if (is_array($clocks) && !empty($clocks)) {
+    $title = t('Are you sure you wish to delete these game clocks?');
+    $message = t('If you press %delete, then the following game clocks will be deleted:', array('%delete' => t('Delete')));
+    $items = array();
+    foreach ($clocks as $state) {
+      $items[] = t('%clock', array('%clock' => $state->title));
+    }
+    $message .= theme('item_list', $items);
+    $message .= t('These game clocks may not be recovered.');
+  }
+  else {
+    drupal_not_found();
+  }
+  $form['clocks'] = array(
+    '#type' => 'value',
+    '#value' => $clocks,
+  );
+  $form['#submit'][] = 'game_clock_delete_form_submit';
+  return confirm_form($form, $title, 'admin/settings/game_clock', $message, t('Delete'));
+}
+
+function game_clock_delete_form_submit($form, &$form_state) {
+  foreach ($form_state['values']['clocks'] as $clock => $state) {
+    game_clock_delete($clock, TRUE);
+  }
+  $form_state['redirect'] = 'admin/settings/game_clock';
+}
+
+/**
+ *  Callback for admin/settings/game_clock/%game_clock.
+ *  This displays the edit game clock form.
+ */
+function game_clock_edit_page($clock) {
+  drupal_set_title(t('Edit @clock', array('@clock' => $clock->title)));
+  return drupal_get_form('game_clock_form', $clock);
+}
+
+/**
+ *  Callback for admin/settings/game_clock/%game_clock/pause.
+ *  This pauses the game clock.
+ */
+function game_clock_pause_page($clock) {
+  game_clock_pause($clock->name);
+  drupal_set_message(t("Paused the %clock game clock.", array('%clock' => $clock->title)));
+  drupal_goto('admin/settings/game_clock');
+}
+
+/**
+ *  Callback for admin/settings/game_clock/%game_clock/start.
+ *  This pauses the game clock.
+ */
+function game_clock_start_page($clock) {
+  game_clock_start($clock->name);
+  drupal_set_message(t("Started the %clock game clock.", array('%clock' => $clock->title)));
+  drupal_goto('admin/settings/game_clock');
+}
+
+/**
+ *
+ */
+function game_clock_form($form_state, $clock = NULL) {
+  $clock = (object) $clock;
   $form = array();
   $form['clock'] = array(
     '#type' => 'fieldset',
-    '#title' => t('Create new game clock'),
-    '#collapsible' => TRUE,
-    '#collapsed' => TRUE,
-    '#description' => t('You may add a new clock with this form. This can be useful for tracking game turns, special effects, and the like. You can also create clocks programmatically. See the !help page for more information.', array('!help' => l('game clock help', 'admin/help/game_clock'))),
+    '#title' => !isset($clock->cid) ? t('Create new game clock') : t('Game clock'),
+    '#collapsible' => !isset($clock->cid),
+    '#collapsed' => !isset($clock->cid),
+    '#description' => t('Game clocks can be useful for tracking game turns, special effects, and the like. You can also create clocks programmatically. See the !help page for more information.', array('!help' => l('game clock help', 'admin/help/game_clock'))),
   );
   $form['clock']['name'] = array(
     '#type' => 'textfield',
     '#title' => t('Name'),
     '#required' => TRUE,
     '#description' => t('A unique machine name for this game clock. It must contain only lower-case, alphanumeric characters and underscores, and begin with a letter.'),
+    '#default_value' => isset($clock->name) ? $clock->name : '',
   );
   $form['clock']['title'] = array(
     '#type' => 'textfield',
     '#title' => t('Title'),
     '#description' => t('A human readable title for this game clock.'),
+    '#default_value' => isset($clock->title) ? $clock->title : '',
+    '#required' => TRUE,
   );
   $form['clock']['status'] = array(
     '#type' => 'checkbox',
     '#title' => t('Start clock'),
-    '#default_value' => TRUE,
     '#description' => t('If checked, then this game clock will begin started. Otherwise, it will be paused.'),
+    '#default_value' => isset($clock->status) ? $clock->status : TRUE,
   );
   $form['clock']['turn'] = array(
     '#type' => 'textfield',
     '#title' => t('Starting turn'),
-    '#default_value' => '0',
+    '#default_value' => isset($clock->turn) ? $clock->turn : 0,
     '#description' => t('What turn should the clock begin at?'),
   );
   $form['clock']['increment'] = array(
     '#type' => 'select',
     '#options' => _game_clock_selections(),
-    '#default_value' => GAME_CLOCK_INCREMENT_DEFAULT,
+    '#default_value' => isset($clock->increment) ? $clock->increment : GAME_CLOCK_INCREMENT_DEFAULT,
     '#required' => TRUE,
     '#description' => t('The clock will wait at least this much time before incrementing to the next tick.'),
   );
   $form['clock']['block'] = array(
     '#type' => 'checkbox',
     '#title' => t('Create display block'),
-    '#default_value' => TRUE,
+    '#default_value' => isset($clock->block) ? $clock->block : FALSE,
     '#description' => t('If checked, then make a block available that will display the current turn and status of this clocked.'),
   );
   $form['clock']['init'] = array(
     '#type' => 'checkbox',
     '#title' => t('Increment clock on page load'),
-    '#default_value' => TRUE,
+    '#default_value' => isset($clock->init) ? $clock->init : TRUE,
     '#description' => 'If checked, then this clock will be checked for incrementation on normal page loads. Otherwise, it will only be checked during a cron run. If a clock has an increment value higher than the cron settings, it may be useful to check this box.',
   );
   $form['clock']['submit'] = array(
     '#type' => 'submit',
-    '#value' => t('Create clock'),
+    '#value' => isset($clock->cid) ? t('Save changes') : t('Create clock'),
+  );
+  $form['clock']['cid'] = array(
+    '#type' => 'value',
+    '#value' => $clock->cid,
   );
   return $form;
 }
 
-function game_clock_settings_add_form_validate($form, &$form_state) {
+/**
+ *  Form validation for game_clock_form.
+ *  @see game_clock_form
+ */
+function game_clock_form_validate($form, &$form_state) {
   $state = $form_state['values'];
   // Ensure a safe machine name.
   if (!preg_match('/^[a-z_][a-z0-9_]*$/', $state['name'])) {
@@ -205,20 +332,63 @@ function game_clock_settings_add_form_validate($form, &$form_state) {
   }
   else {
     // Ensure the machine name is unique.
-    $test_state = game_clock_state($this['name']);
-    if ($test_state->cid) {
+    $test_state = game_clock_state($state['name']);
+    if ($test_state->cid && ($test_state->cid != $state['cid'])) {
       form_set_error('name', t('Game clock names must be unique. This game clock name is already in use.'));
+    }
+  }
+  if (isset($state['cid'])) {
+    $test_state = game_clock_state($state['cid'], TRUE);
+    if (!isset($test_state->cid)) {
+      form_set_error('', t('This game clock has been deleted.'));
     }
   }
 }
 
-function game_clock_settings_add_form_submit($form, &$form_state) {
-  $state = game_clock_create($form_state['values'], TRUE);
-  if ($state->cid) {
-    drupal_set_message(t("The %clock game clock was successfully created.", array('%clock' => $state->title)));
+/**
+ *  Form submission for game_clock_form.
+ *  @see game_clock_form
+ */
+function game_clock_form_submit($form, &$form_state) {
+  if (isset($form_state['values']['cid'])) {
+    // Get the currently stored state.
+    $state = game_clock_state($form_state['values']['cid'], TRUE);
+
+    // Store the old name, so we can redirect if it's changed.
+    $old_name = $state->name;
+
+    // Only save if the state is already in the database.
+    // This should already be taken care of in the validation step.
+    if ($state->cid) {
+      // By calling array_merge, we replace the $state with the new values.
+      $state = array_merge((array) $state, $form_state['values']);
+
+      // Save our new game clock state.
+      $state = game_clock_save($state);
+
+      drupal_set_message(t("Saved changes to the %clock game clock.", array('%clock' => $state->title)));
+
+      // If we changed the name, then redirect to the new edit page.
+      if ($state && ($old_name != $state->name)) {
+        drupal_goto('admin/settings/game_clock/'. $state->name);
+      }
+    }
+  }
+  else {
+    // Create a new game clock state.
+    $state = game_clock_create($form_state['values'], TRUE);
   }
 }
 
+/**
+ *  Build an array of increment times, suitable for a select drop-down list.
+ *  @param $increment
+ *    (optional) The number of seconds for which we wish to see a description.
+ *  @return
+ *    If $increment is NULL, then return the entire array.
+ *    If it's a key in the array, then return the resulting description.
+ *    Otherwise, return a translated string of '@increment seconds'.
+ */
 function _game_clock_selections($increment = NULL) {
   static $selections;
   if (is_null($selections)) {
@@ -227,19 +397,27 @@ function _game_clock_selections($increment = NULL) {
       1 => t('1 seconds'),
       2 => t('2 seconds'),
       3 => t('3 seconds'),
+      4 => t('4 seconds'),
       5 => t('5 seconds'),
+      10 => t('10 seconds'),
       15 => t('15 seconds'),
       30 => t('30 seconds'),
       60 => t('1 minute'),
       120 => t('2 minutes'),
+      180 => t('3 minutes'),
+      240 => t('4 minutes'),
       300 => t('5 minutes'),
       600 => t('10 minutes'),
       900 => t('15 minutes'),
       1800 => t('30 minutes'),
       3600 => t('1 hour'),
       (3600 * 2) => t('2 hours'),
+      (3600 * 3) => t('3 hours'),
       (3600 * 4) => t('4 hours'),
+      (3600 * 5) => t('5 hours'),
+      (3600 * 6) => t('6 hours'),
       (3600 * 8) => t('8 hours'),
+      (3600 * 10) => t('10 hours'),
       (3600 * 12) => t('12 hours'),
       (3600 * 24) => t('1 day'),
       (3600 * 24 * 2) => t('2 days'),
@@ -256,7 +434,7 @@ function _game_clock_selections($increment = NULL) {
   if (isset($selections[$increment])) {
     return $selections[$increment];
   }
-  return t('@count seconds', array('@count' => $increment));
+  return t('@increment seconds', array('@increment' => $increment));
 }
 
 /**
@@ -267,7 +445,8 @@ function _game_clock_selections($increment = NULL) {
  *    ['title'] => A human readable name for the clock.
  *    ['increment'] => The number of seconds before incrementing each tick.
  *  @param $report_errors
- *    If TRUE, then display messages of any errors. In any case, errors will be logged to the watchdog.
+ *    If TRUE, then display messages of any errors. In any case, errors will be
+ *    logged to the watchdog.
  *  @return
  *    Either the newly created clock object, or FALSE if there was an error.
  */
@@ -315,18 +494,20 @@ function _game_clock_create($state, $report_errors = FALSE) {
 /**
  *  Delete a game clock.
  *  This will also invoke hook_game_clock('delete', $state->name, $state),
- *  after it's been deleted from the database and wiped from the global variable.
+ *  after it's been deleted from the database and wiped from the global
+ *  variable.
  *  @param $clock
  *    The string of the clock.
  *  @param $report_errors
- *    If TRUE, then display messages of any errors. In any case, errors will be logged to the watchdog.
+ *    If TRUE, then display messages of any errors. In any case, errors will be
+ *    logged to the watchdog.
  *  @return
  *    TRUE if succeeded; otherwise, FALSE.
  */
 function _game_clock_delete($clock, $report_errors = FALSE) {
   $state = game_clock_state($clock);
   if (!$state->cid) {
-    $error = "Tried to delete non-existant game clock: %clock";
+    $error = "Tried to delete non-existent game clock: %clock";
     $options = array('%clock' => $clock);
     if ($report_errors) {
       drupal_set_message(t($error, $options), 'error');
@@ -348,13 +529,75 @@ function _game_clock_delete($clock, $report_errors = FALSE) {
 }
 
 /**
+ *  Saves a game clock state.
+ *  This assumes the game clock has already been created, and is being edited.
+ *  @param $state
+ *    The game clock state to save.
+ *  @param $report_errors
+ *    If TRUE, then display messages of any errors. In any case, errors will be
+ *    logged to the watchdog.
+ *  @return
+ *    The new state if succeeded; otherwise, FALSE.
+ */
+function _game_clock_save($state, $report_errors = FALSE) {
+  $state = (object) $state;
+
+  // As we may have changed our increment, ensure it starts over the timer.
+  // Otherwise, you may have had a clock increment every 24 hours, then change
+  // it to 15 seconds, but have to wait for a day before the first tick.
+  $state->next_tick = 0;
+  if ($state->cid) {
+    // Make sure we're trying to save a clock that hasn't been deleted.
+    $test_state = db_fetch_object(db_query("SELECT * FROM {game_clocks} WHERE cid = %d", $state->cid));
+    if ($test_state->cid) {
+      $status = db_query("UPDATE {game_clocks} SET name = '%s', title = '%s', status = %d, turn = %d, increment = %d, block = %d, init = %d, next_tick = 0 WHERE cid = %d", $state->name, $state->title, $state->status, $state->turn, $state->increment, $state->block, $state->init, $state->cid);
+      if (!$status) {
+        $error = 'Saving the %clock game clock failed for an unknown reason.';
+        $options = array('%clock' => $state->title);
+        $link = l(t('edit'), 'admin/settings/game_clock/'. $state->name);
+        game_clock_report_error($error, $options, $report_errors, 'error', $link);
+        return FALSE;
+      }
+      return $state;
+    }
+  }
+  $error = 'Tried to save unknown game clock %name (with a CID of %cid).';
+  $options = array('%name' => $state->name, '%cid' => $state->cid);
+  game_clock_report_error($error, $options, $report_errors, 'error');
+  return FALSE;
+}
+
+/**
+ *  Report an error with a game clock function.
+ *  @param $message
+ *    The untranslated message to report.
+ *  @param $options
+ *    (optional) An array of any translating options to send, as in the
+ *    t($message, $options) function.
+ *  @param $report_errors
+ *    (optional) If TRUE, then the error will be reported to the user via
+ *    drupal_set_message.
+ *    It will be logged through the watchdog in any case.
+ *  @param $type
+ *    (optional) The message type, either 'error' or 'status'.
+ *  @param $link
+ *    (optional) A link to pass to the watchdog.
+ */
+function game_clock_report_error($message, $options = array(), $report_errors = FALSE, $type = 'status', $link = NULL) {
+  $watchdog_type = ($type == 'error') ? WATCHDOG_ERROR : WATCHDOG_NOTICE;
+  if ($report_errors) {
+    drupal_set_message(t($message, $options), $type);
+  }
+  watchdog('game_clock', $message, $options, $watchdog_type, $link);
+}
+
+/**
  *  Render the form as a table of clock settings and ops.
  */
 function theme_game_clock_settings_form($form) {
   $output .= drupal_render($form['selector']);
-  $output .= drupal_render($form['submit']);
   $select_header = theme('table_select_header_cell');
-  $header = array($select_header, t('Title'), t('State'), t('Turn'), t('Increment'), t('On page load?'), t('Ops'));
+  $header = array($select_header, t('Title'), t('Status'), t('Turn'), t('Increment'), t('Page load'), t('Ops'));
   $rows = array();
   foreach ($form['game_clocks']['#value'] as $clock => $state) {
     $cells = array();
@@ -368,5 +611,7 @@ function theme_game_clock_settings_form($form) {
     $rows[] = $cells;
   }
   $output .= theme('table', $header, $rows);
+  $output .= drupal_render($form);
+
   return $output;
 }
