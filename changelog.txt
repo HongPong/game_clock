@@ -2,6 +2,7 @@
 
 December 2008
 ----------
+ * Add db select of game clocks by cid (aaron).
  * Add title to increment on add clock form (aaron).
  * Change 'selector' to 'select' on settings form #types (aaron).
  * Remove extra : on 'With selected clocks:' (aaron).

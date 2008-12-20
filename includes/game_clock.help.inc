@@ -45,33 +45,28 @@ function _game_clock_help($section) {
   game_clock_save(\$clock, \$report_errors = FALSE);
   game_clock_delete(\$clock, \$report_errors = FALSE);
 </pre>
-    <p>Additionally, you may create a hook_game_clock function in your module to act on game clock events, as follows, noting that \$state will be an object, rather than an array:</p>
+    <p>Additionally, you may create a hook_game_clock function in your module to act on game clock events, as follows, noting that \$state will be an object, rather than an array. All of these functions are called with (\$clock = 'default', \$state = NULL); where \$clock is the name of the clock, and \$state is the object representing the clocks state.</p>
 <pre>
-  function hook_game_clock(\$op, \$clock = 'default', \$state = NULL) {
-    switch (\$op) {
-      case 'create':
-        // A clock named \$clock has been created with \$state.
-        break;
-      case 'pause':
-        // The clock named \$clock has just been paused.
-        break;
-      case 'start':
-        // The clock named \$clock has just been started.
-        break;
-      case 'increment':
-        // The clock named \$clock has just been incremented a tick.
-        break;
-      case 'reset':
-        // The clock named \$clock has just been reset to 0 turns.
-        break;
-      case 'save':
-        // The clock named \$clock has just been edited and saved.
-        break;
-      case 'delete':
-        // The clock named \$clock has just been deleted.
-        break;
-    }
-  }
+  // A clock named \$clock has been created with \$state.
+  hook_game_clock_create(\$clock = 'default', \$state = NULL);
+
+  // The clock named \$clock has just been paused.
+  hook_game_clock_pause(\$clock = 'default', \$state = NULL);
+
+  // The clock named \$clock has just been started.
+  hook_game_clock_start(\$clock = 'default', \$state = NULL);
+
+  // The clock named \$clock has just been incremented a tick.
+  hook_game_clock_increment(\$clock = 'default', \$state = NULL);
+
+  // The clock named \$clock has just been reset to 0 turns.
+  hook_game_clock_reset(\$clock = 'default', \$state = NULL);
+
+  // The clock named \$clock has just been edited and saved.
+  hook_game_clock_save(\$clock = 'default', \$state = NULL);
+
+  // The clock named \$clock has just been deleted.
+  hook_game_clock_delete(\$clock = 'default', \$state = NULL);
 </pre>
     <p>Please read the documentation in the game_clock.module file for more information.</p>
 ", array('!game_clock' => l(t('Game Clock administration'), 'admin/settings/game_clock')));

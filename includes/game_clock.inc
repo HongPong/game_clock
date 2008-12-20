@@ -40,7 +40,7 @@ function _game_clock_create($state, $report_errors = FALSE) {
     return FALSE;
   }
   $state = game_clock_state($state->name);
-  module_invoke_all('game_clock', 'create', $state->name, $state);
+  module_invoke_all('game_clock_create', $state->name, $state);
   $message = 'Created %title game clock.';
   $options = array('%title' => $state->title);
   $link = l(t('@name', array('@name' => $state->title)), 'admin/settings/game_clock/'. $state->name);
@@ -50,7 +50,7 @@ function _game_clock_create($state, $report_errors = FALSE) {
 
 /**
  *  Delete a game clock.
- *  This will also invoke hook_game_clock('delete', $state->name, $state),
+ *  This will also invoke hook_game_clock_delete($state->name, $state),
  *  after it's been deleted from the database and wiped from the global
  *  variable.
  *  @param $clock
@@ -72,7 +72,7 @@ function _game_clock_delete($clock, $report_errors = FALSE) {
   db_query("DELETE FROM {game_clocks} WHERE cid = %d", $state->cid);
   global $game_clocks;
   unset($game_clocks[$state->name]);
-  module_invoke_all('game_clock', 'delete', $state->name, $state);
+  module_invoke_all('game_clock_delete', $state->name, $state);
   $message = 'Deleted %title game clock.';
   $options = array('%title' => $state->title);
   game_clock_report_error($message, $options, $report_errors);
@@ -111,7 +111,7 @@ function _game_clock_save($state, $report_errors = FALSE) {
       }
       global $game_clocks;
       $game_clocks[$state->name] = $state;
-      module_invoke_all('game_clock', 'save', $state->name, $state);
+      module_invoke_all('game_clock_save', $state->name, $state);
       return $state;
     }
   }
