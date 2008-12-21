@@ -2,6 +2,7 @@
 
 December 2008
 ----------
+ * Subtract modulus of seconds passed for better accuracy (aaron).
  * Add db select of game clocks by cid (aaron).
  * Add title to increment on add clock form (aaron).
  * Change 'selector' to 'select' on settings form #types (aaron).

@@ -87,14 +87,20 @@ function game_clock_increment($clock = 'default', $force = FALSE) {
 
     // If the clock has run in the past, then figure out how many turns we've missed.
     // This ensures the clock represents the correct tick.
-    $game_clocks[$clock]->ticks = ($game_clocks[$clock]->next_tick ? floor((time() - $game_clocks[$clock]->next_tick) / $game_clocks[$clock]->increment) : 0) + 1;
+
+    // First, get the number of seconds passed since it should have ticked.
+    $passed = time() - $game_clocks[$clock]->next_tick;
+
+    // The number of ticks will equal the number of seconds passed divided by the increment, rounding down and adding one.
+    $game_clocks[$clock]->ticks = ($game_clocks[$clock]->next_tick ? floor($passed / $game_clocks[$clock]->increment) : 0) + 1;
 
     // Increment the clock by the number of turns missed, plus 1 for the next turn.
     $game_clocks[$clock]->turn += $game_clocks[$clock]->ticks;
 
     if ($game_clocks[$clock]->increment) {
       // Record the next turn that we should increment the clock.
-      $game_clocks[$clock]->next_tick = time() + $game_clocks[$clock]->increment;
+      // Subtract the amount left over from our earlier $passed division for better accuracy.
+      $game_clocks[$clock]->next_tick = time() + $game_clocks[$clock]->increment - fmod($passed, $game_clocks[$clock]->increment);
     }
 
     // Store the clock state to the database. Note that we don't store the ->ticks,
