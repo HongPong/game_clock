@@ -1,0 +1,39 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Implementation of hook_install().
+ */
+function game_clock_field_install() {
+  drupal_load('module', 'content');
+  content_notify('install', 'game_clock_field');
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function game_clock_field_uninstall() {
+  drupal_load('module', 'content');
+  content_notify('uninstall', 'game_clock_field');
+}
+
+/**
+ * Implementation of hook_enable().
+ *
+ * Notify content module when this module is enabled.
+ */
+function game_clock_field_enable() {
+  drupal_load('module', 'content');
+  content_notify('enable', 'game_clock_field');
+}
+
+/**
+ * Implementation of hook_disable().
+ *
+ * Notify content module when this module is disabled.
+ */
+function game_clock_field_disable() {
+  drupal_load('module', 'content');
+  content_notify('disable', 'game_clock_field');
+}

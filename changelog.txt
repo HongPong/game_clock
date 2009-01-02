@@ -1,5 +1,9 @@
 // $Id$
 
+January 2009
+------------
+ * Create Game Clock Field module to add game clock fields to nodes (aaron).
+
 December 2008
 ----------
  * Subtract modulus of seconds passed for better accuracy (aaron).

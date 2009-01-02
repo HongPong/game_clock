@@ -539,3 +539,21 @@ function theme_game_clock_settings_form($form) {
 
   return $output;
 }
+
+/**
+ *  Return an array of all current game clock types.
+ *  @param $force
+ *    If TRUE, then force the types to rebuild from an otherwise static cache.
+ */
+function _game_clock_types($force = FALSE) {
+  static $types;
+
+  if (is_null($types) || $force) {
+    $types = array();
+    $results = db_query("SELECT type FROM {game_clocks} GROUP BY type");
+    while ($state = db_fetch_object($results)) {
+      $types[$state->type] = $state->type;
+    }
+  }
+  return $types;
+}

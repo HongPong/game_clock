@@ -246,6 +246,25 @@ function game_clock_state($clock = NULL, $is_cid = FALSE) {
 }
 
 /**
+ *  Returns all clocks of a specified type.
+ *  @param $type
+ *    (optional, defaults to '') The type of clock to return.
+ *  @return
+ *    An array of all game clock objects matching the type.
+ */
+function game_clock_type_states($type = '') {
+  global $game_clocks;
+
+  $clocks = array();
+  $results = db_query("SELECT * FROM {game_clocks} WHERE type = '%s'", $type);
+  while ($state = db_fetch_object($results)) {
+    $game_clocks[$state->name] = $clocks[$state->name] = $state;
+  }
+
+  return $clocks;
+}
+
+/**
  *  Implements hook_init().
  */
 function game_clock_init() {
