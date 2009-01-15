@@ -1,5 +1,5 @@
 ; $Id$
-name = Game Clock
+name = Game Utility Clock
 description = Increment game turns automatically.
 core = 6.x
-package = Game
+package = Game Utilities
