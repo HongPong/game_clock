@@ -45,6 +45,7 @@ Other available functions in the Game Clock API that may be useful:
   game_clock_create($state, $report_errors = FALSE)
   game_clock_save($clock, $report_errors = FALSE);
   game_clock_delete($clock, $report_errors = FALSE);
+  game_clock_current_turn($clock = 'default');
 
 Additionally, you may create a hook_game_clock function in your module to act
 on game clock events, as follows, noting that \$state will be an object, rather

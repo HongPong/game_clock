@@ -206,19 +206,24 @@ function game_clock_save($state, $report_errors = FALSE) {
  *    If $clock is NULL, then return all game clock states. Otherwise, just the
  *    state asked for.
  */
-function game_clock_state($clock = NULL, $is_cid = FALSE) {
+function game_clock_state($clock = NULL, $is_cid = NULL) {
   global $game_clocks;
 
-  if (is_null($game_clocks)) {
+  if (!isset($game_clocks)) {
     $game_clocks = array();
   }
-  if (is_null($clock)) {
+  if (!isset($clock)) {
     $game_clocks = array();
     $results = db_query('SELECT * FROM {game_clocks}');
     while ($result = db_fetch_object($results)) {
       $game_clocks[$result->name] = $result;
     }
     return $game_clocks;
+  }
+
+  // If we don't specify, we try to determine if we were passed a number.
+  if (!isset($is_cid)) {
+    $is_cid = is_numeric($clock);
   }
 
   if ($is_cid) {
@@ -235,7 +240,7 @@ function game_clock_state($clock = NULL, $is_cid = FALSE) {
     return;
   }
 
-  if (is_null($game_clocks[$clock])) {
+  if (!isset($game_clocks[$clock])) {
     $results = db_query('SELECT * FROM {game_clocks} WHERE name = "%s"', $clock);
     while ($result = db_fetch_object($results)) {
       $game_clocks[$result->name] = $result;
@@ -262,6 +267,18 @@ function game_clock_type_states($type = '') {
   }
 
   return $clocks;
+}
+
+/**
+ *  Returns the current turn of the specified game clock.
+ *  @param $clock
+ *    The clock name or cid.
+ *  @return
+ *    The current turn of the clock.
+ */
+function game_clock_current_turn($clock = 'default') {
+  $clock = game_clock_load($clock);
+  return $clock->turn;
 }
 
 /**
@@ -312,8 +329,8 @@ function game_clock_menu() {
  *  Implement hook_load() (for menu, not for node).
  *  Helper function for menu: this loads the %game_clock argument.
  */
-function game_clock_load($clock) {
-  return game_clock_state($clock);
+function game_clock_load($clock, $is_cid = NULL) {
+  return game_clock_state($clock, $is_cid);
 }
 
 /**

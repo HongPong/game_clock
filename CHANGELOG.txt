@@ -1,0 +1,50 @@
+// $Id$
+
+October 2009
+------------
+by aaron: Add game_clock_current_turn($clock).
+by aaron: Allow game_clock_state/load to autoparse clock names or cid.
+
+January 2009
+------------
+ * Change module name and package (aaron).
+ * Create Game Clock Field module to add game clock fields to nodes (aaron).
+
+December 2008
+----------
+ * Subtract modulus of seconds passed for better accuracy (aaron).
+ * Add db select of game clocks by cid (aaron).
+ * Add title to increment on add clock form (aaron).
+ * Change 'selector' to 'select' on settings form #types (aaron).
+ * Remove extra : on 'With selected clocks:' (aaron).
+ * Rebuild menus on .install update (aaron).
+ * Change menu callback for settings pages (aaron).
+ * Move help page to game_clock.help.inc (aaron).
+ * Move API helper functions to game_clock.inc (aaron).
+ * Add documentation for game clock type (aaron).
+ * Save type on create & edit (aaron).
+ * Add type table header & column (aaron).
+ * Create update function for .install to add type to db (aaron).
+ * Add type to game clocks (aaron).
+ * Consolidate error messages (aaron).
+ * Create release (aaron).
+ * Implement reset callback (aaron).
+ * Change constants to variable_gets (aaron).
+ * Add documentation for save hook (aaron).
+ * Invoke save $op for hook_game_clock (aaron).
+ * Ensure game clock state is stored to global on save (aaron).
+ * Add variable configuration to settings page (aaron).
+ * Allow table sort & pager on game clock listings (aaron).
+ * Add tabs for list/add/settings to admin pages (aaron).
+ * Allow deletion of multiple game clocks (aaron).
+ * Add selection options to increment (aaron).
+ * Change initial values of 'default' clock (aaron).
+ * Ensure clock increments properly after edit (aaron).
+ * Move include files into /includes folder (aaron).
+ * Separate menu into game_clock.menu.inc (aaron).
+ * Redirect to new game clock edit if changed name (aaron).
+ * Create edit game clock page (aaron).
+ * Add menu items for various clock admin functions (aaron).
+ * Ensure we account for all missed ticks when incrementing (aaron).
+ * Add hook_delete (aaron).
+ * Create initial module (aaron).
