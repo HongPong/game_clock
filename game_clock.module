@@ -221,6 +221,12 @@ function game_clock_state($clock = NULL, $is_cid = NULL) {
     return $game_clocks;
   }
 
+  // If we've been passed an object, then we'll simply use its cid.
+  if (is_object($clock)) {
+    $clock = $clock->cid;
+    $is_cid = TRUE;
+  }
+
   // If we don't specify, we try to determine if we were passed a number.
   if (!isset($is_cid)) {
     $is_cid = is_numeric($clock);
