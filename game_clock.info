@@ -1,4 +1,3 @@
-; $Id$
 name = Game Clock
 description = Increment game turns automatically.
 core = 6.x
