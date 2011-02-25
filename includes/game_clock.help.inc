@@ -1,5 +1,4 @@
 <?php
-// $Id$
 
 /**
  *  Callback for the game clock help page.

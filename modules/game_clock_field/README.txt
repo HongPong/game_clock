@@ -1,4 +1,3 @@
-// $Id$
 
 Game Clock Field
 

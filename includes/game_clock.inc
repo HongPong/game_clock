@@ -1,5 +1,4 @@
 <?php
-// $Id$
 
 /**
  *  Helper functions for the Game Clock API.

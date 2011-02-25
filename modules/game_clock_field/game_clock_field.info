@@ -1,4 +1,3 @@
-; $Id$
 name = Game Clock Field
 description = Defines a field type for referencing a game clock.
 dependencies[] = content
