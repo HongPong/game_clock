@@ -37,6 +37,7 @@ function game_clock_help($section) {
  *    and increment the clock if needed.
  */
 function game_clock_pause($clock = 'default', $status = FALSE) {
+  drupal_set_message('40 game_clock_pausse CALLED ');
   $state = game_clock_state($clock);
   if ($state->status != $status) {
     global $game_clocks;
@@ -81,6 +82,7 @@ function game_clock_start($clock = 'default') {
  *    incremented.
  */
 function game_clock_increment($clock = 'default', $force = FALSE) {
+  drupal_set_message('85 game_clock_increment CALLED ');
   $state = game_clock_state($clock);
   // If the clock is paused or doesn't exist, then return.
   if (!$state->status) {
@@ -144,6 +146,8 @@ function game_clock_increment($clock = 'default', $force = FALSE) {
  */
 function game_clock_reset($clock = 'default', $turn = NULL) {
   global $game_clocks;
+  drupal_set_message('147 game_clock_reset CALLED ');
+
   $state = game_clock_state($clock);
   $game_clocks[$clock]->turn = isset($turn) ? $turn : 0;
   $game_clocks[$clock]->next_tick = 0;
@@ -230,11 +234,17 @@ function game_clock_save($state, $report_errors = FALSE) {
  */
 function game_clock_state($clock = NULL, $is_cid = NULL) {
   global $game_clocks;
-
+  drupal_set_message('233 GAMECLOCKSTATE CALLED ');
+  drupal_set_message('234 the clock is $clock ' . $clock);
+  dpm($game_clocks);
+  dpm($clock);
+  dpm($is_cid);
+  //print_r($clock) ; print('is clock');
   if (!isset($game_clocks)) {
     $game_clocks = array();
   }
   if (!isset($clock)) {
+    drupal_set_message('242 no clock at game clock state');
     $game_clocks = array();
     $results = db_query('SELECT * FROM {game_clocks}');
     // TODO needs to be patched database for D7 ^
@@ -247,37 +257,57 @@ function game_clock_state($clock = NULL, $is_cid = NULL) {
 
   // If we've been passed an object, then we'll simply use its cid.
   if (is_object($clock)) {
+    drupal_set_message('255 game clock state got $clock object');
     $clock = $clock->cid;
     $is_cid = TRUE;
   }
 
   // If we don't specify, we try to determine if we were passed a number.
   if (!isset($is_cid)) {
+      drupal_set_message('262 game clock state got $clock object w.o cid');
     $is_cid = is_numeric($clock);
   }
 
   if ($is_cid) {
+      drupal_set_message('267 game clock state got $is_cid true');
+
     foreach ($game_clocks as $name => $state) {
       if ($state->cid == $clock) {
         return $state;
       }
     }
-    $result = db_fetch_object(db_query("SELECT * FROM {game_clocks} WHERE cid = :cid", array(':cid' => $clock)));
-    if ($result->cid) {
+        //$result = db_query("SELECT * FROM {game_clocks} WHERE cid = %d", array($clock))->fetchObject();
+        $result = db_query("SELECT * FROM {game_clocks} WHERE cid = :cid", array(':cid' => $clock));
+    //WAS $result = db_fetch_object(db_query("SELECT * FROM {game_clocks} WHERE cid = :cid", array(':cid' => $clock)));
+    if (isset($result->cid) && $result->cid) {
       $game_clocks[$result->name] = $result;
       return $result;
     }
     return;
   }
 
-  if (!isset($game_clocks[$clock])) {
+ /* if (!isset($game_clocks[$clock])) {
     $results = db_query('SELECT * FROM {game_clocks} WHERE name = :name', array(':name' => $clock));
     while ($result = db_fetch_object($results)) {
       $game_clocks[$result->name] = $result;
     }
-  }
+  }*/
+      drupal_set_message('290 game clock state finally to sql');
+
+    $sql = db_query('SELECT * FROM {game_clocks} WHERE name = :clock_name', array(
+   ':clock_name' => $clock));
+       drupal_set_message('294 $sql = ' . var_dump($sql));
+
+    // end patch d7 db
+    while ($result = db_query($sql)->fetchObject()) {
+    //while ($result = db_fetch_object($results)) {
+      $game_clocks[$result->name] = $result;
+    }
+  dpm($game_clocks[$clock]);
+      drupal_set_message('302 game clock state lets retunr $game_clocks[$clock]' . $game_clocks);
 
   return $game_clocks[$clock];
+  //TODO Undefined index: testname in game_clock_state() 
 }
 
 /**
@@ -288,6 +318,7 @@ function game_clock_state($clock = NULL, $is_cid = NULL) {
  *    An array of all game clock objects matching the type.
  */
 function game_clock_type_states($type = '') {
+  drupal_set_message('316 game_clock_type_statuses called');
   global $game_clocks;
 
   $clocks = array();
@@ -378,7 +409,10 @@ function game_clock_menu() {
  *  Helper function for menu: this loads the %game_clock argument.
  */
 function game_clock_load($clocks, $is_cid = NULL) {
+  drupal_set_message('408 game_clock_load CALLED ');
+  drupal_set_message('game_clock_load' . $clocks);
   foreach ($clocks as $nid => &$clock) {
+    drupal_set_message('411 foreach ($ clocks as $ nid => &$ clock) a Clock State eval ');
     $node_additions = game_clock_state($clock, $is_cid);
     foreach ($node_additions as $property => &$value) {
       $clock->$property = $value;
@@ -402,7 +436,9 @@ function game_clock_permission() {
  * Implements hook_block_info().
  */
 function game_clock_block_info() {
+  drupal_set_message('408 game_clock_block_info CALLED ');
   $blocks = array();
+  
   foreach (game_clock_state() as $game => $state) {
     // Only make a block available if it's been checked on the game clock administration page.
     if ($state->block) {
@@ -418,6 +454,7 @@ function game_clock_block_info() {
  * Implements hook_block_view().
  */
 function game_clock_block_view($delta) {
+  drupal_set_message('408 game_clock_block_view CALLED ');
   $state = game_clock_state($delta);
   if ($state->cid) {
     $block = array(

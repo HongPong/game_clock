@@ -281,6 +281,10 @@ function game_clock_delete_form_submit($form, &$form_state) {
  *  Reset confirmation form.
  */
 function game_clock_reset_form(&$form_state, $clocks) {
+  dpm($clocks . 'is clocks admin284');
+  drupal_set_message('285ADMIN game_clock_reset_form is $clocks' . $clocks);
+  dpm($form_state);
+  $message = "";
   if (is_object($clocks)) {
     $title = t('Are you sure you wish to reset the %clock game clock?', array('%clock' => $clocks->title));
     $message = t('If you press %reset, then the %clock game clock will be reset to 0 turns, which may not be undone.', array('%reset' => t('Reset'), '%clock' => $clocks->title));
@@ -303,6 +307,7 @@ function game_clock_reset_form(&$form_state, $clocks) {
     '#type' => 'value',
     '#value' => $clocks,
   );
+
   $form['#submit'][] = 'game_clock_reset_form_submit';
   return confirm_form($form, $title, 'admin/config/game_clock', $message, t('Reset'));
 }
@@ -485,21 +490,34 @@ function game_clock_settings() {
  *  @see game_clock_form
  */
 function game_clock_form_validate($form, &$form_state) {
+  drupal_set_message('ADMIN493 game_clock_form_validate CALLED ');
+
+  dpm($form);
+  dpm($form_state);
   $state = $form_state['values'];
+  dpm($state);
   // Ensure a safe machine name.
   if (!preg_match('/^[a-z_][a-z0-9_]*$/', $state['name'])) {
     form_set_error('name', t('The game clock name may only contain lowercase letters, underscores, and numbers; and begin with a letter.'));
   }
   else {
     // Ensure the machine name is unique.
+      drupal_set_message('ADMIN504 CHECKIGN $ test_state game_clock_state with that NAME ');
     $test_state = game_clock_state($state['name']);
-    if ($test_state->cid && ($test_state->cid != $state['cid'])) {
+      drupal_set_message('ADMIN506 game_clock_state RETURNED in game_clock_form_validate');
+    // TODO what's up with this CID THING? DF
+    if (isset($test_state->cid) && $test_state->cid && ($test_state->cid != $state['cid'])) {
+      drupal_set_message('ADMIN509 (isset($ test_state->cid) && $ test_state->cid && ($ test_state->cid != $state[cid])) RETURNS TRUE');
+
       form_set_error('name', t('Game clock names must be unique. This game clock name is already in use.'));
     }
   }
   if (isset($state['cid'])) {
+    drupal_set_message("ADMIN509 if (isset($ state['cid'])) is true");
     $test_state = game_clock_state($state['cid'], TRUE);
     if (!isset($test_state->cid)) {
+          drupal_set_message("ADMIN512  if (!isset($ test_state->cid))  is true");
+
       form_set_error('', t('This game clock has been deleted.'));
     }
   }
