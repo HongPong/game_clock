@@ -9,6 +9,17 @@
  *  Callback for admin/settings/game_clock.
  */
 function game_clock_list_page() {
+  
+  //dpm(drupal_get_form('game_clock_list_form'));
+  
+  $build = array();
+  /*$build['content'] = array(
+    'game_clock_list_form_part' => drupal_get_form('game_clock_list_form'),
+    //'#markup' => 'bar bar bar',
+  );*/
+  $build['form_one'] = drupal_get_form('game_clock_list_form');
+  $build['form_two'] = drupal_get_form('game_clock_form');
+  /*$output = "";
   $output .= drupal_get_form('game_clock_list_form');
   global $game_clock_settings_page_standard_form;
   if ($game_clock_settings_page_standard_form) {
@@ -16,7 +27,13 @@ function game_clock_list_page() {
     // TODO Please change this theme call to use an associative array for the $variables parameter.
     $output .= variable_get('game_clock_settings_form_count', 50) ? theme('pager') : '';
   }
-  return $output;
+  dpm($output);
+  return $output;*/
+  dpm($build);
+  return $build;
+  // print drupal_render(drupal_get_form
+  //drupal_render($build);
+  //return drupal_render(drupal_get_form('game_clock_list_form')); 
 }
 
 /**
@@ -47,7 +64,9 @@ function game_clock_list_form($form, $form_state) {
   $game_clocks = array();
   // TODO Please change this theme call to use an associative array for the $variables parameter.
   $header = array(
-    theme('table_select_header_cell'),
+    //theme('table_select_header_cell'),
+        //theme('table_select_header_cell'), deprecaed in 6
+
     array(
       'data' => t('Title'),
       'field' => 'title',
@@ -399,9 +418,15 @@ function game_clock_form($form, $form_state, $clock = NULL) {
     '#type' => 'submit',
     '#value' => isset($clock->cid) ? t('Save changes') : t('Create clock'),
   );
+  
+  $valuecid = "";
+  if (isset($clock->cid)) {
+    $valuecid = (string) $clock->cid;
+  }
+  
   $form['clock']['cid'] = array(
     '#type' => 'value',
-    '#value' => $clock->cid,
+    '#value' => $valuecid, // $clock->cid,
   );
   return $form;
 }
@@ -576,6 +601,7 @@ function _game_clock_selections($increment = NULL) {
  *  Render the form as a table of clock settings and ops.
  */
 function theme_game_clock_settings_form($variables) {
+  $output = ""; // ADDED DF
   $form = $variables['form'];
   $output .= drupal_render($form['selector']);
   $header = $form['table_header']['#value'];
