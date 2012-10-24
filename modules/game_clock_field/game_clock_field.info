@@ -1,6 +1,5 @@
 name = Game Clock Field
 description = Defines a field type for referencing a game clock.
-dependencies[] = content
 dependencies[] = text
 dependencies[] = optionwidgets
 dependencies[] = game_clock

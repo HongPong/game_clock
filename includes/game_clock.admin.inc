@@ -75,16 +75,36 @@ function game_clock_list_form($form, $form_state) {
     ),
     t('Ops'),
   );
-  $sql = "SELECT * FROM {game_clocks}";
-  $sql .= tablesort_sql($header);
+  
+  $rows = array();
+  
+  $query = db_select('game_clocks', 'g');
+  $query
+    ->extend('TableSort') // see
+    // http://api.drupal.org/api/drupal/includes!tablesort.inc/class/TableSort/7
+    ->fields('g', array('title', 'type', 'status', 'turn', 'increment', 'init', ))
+    ->orderByHeader($header);
+  //$sql = "SELECT * FROM {game_clocks}";
+  //$sql .= tablesort_sql($header);
+  // http://nanwich.com/node/335
+  // TODO: what does this thing do?
+  // game_clock_settings_form_count limits the number of clocks, default 50
+
+  
+  
+  //$sql = "SELECT * FROM {game_clocks}";
+  //$sql .= tablesort_sql($header);
   if (variable_get('game_clock_settings_form_count', 50)) {
-    $results = pager_query($sql, variable_get('game_clock_settings_form_count', 50));
+    //$results = pager_query($sql, variable_get('game_clock_settings_form_count', 50));
+    $query->range(0, variable_get('game_clock_settings_form_count', 50));
+    $results = $query->execute();  
   }
   else {
-    // TODO Please convert this statement to the D7 database API syntax.
-    $results = db_query($sql);
+    $results = $query->execute();
+  //$results = db_query($sql);
   }
-  while ($clock = db_fetch_object($results)) {
+  while ($clock = $results->fetchObject()) {
+  //was while ($clock = db_fetch_object($results)) {
     $game_clocks[$clock->name] = $clock;
   }
 

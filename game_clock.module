@@ -237,7 +237,9 @@ function game_clock_state($clock = NULL, $is_cid = NULL) {
   if (!isset($clock)) {
     $game_clocks = array();
     $results = db_query('SELECT * FROM {game_clocks}');
-    while ($result = db_fetch_object($results)) {
+    // TODO needs to be patched database for D7 ^
+    //while ($result = db_fetch_object($results)) {
+    while ($result = $results->fetchObject()) {
       $game_clocks[$result->name] = $result;
     }
     return $game_clocks;
@@ -310,20 +312,34 @@ function game_clock_current_turn($clock = 'default') {
 }
 
 /**
- * Implements hook_init().
+ * Implements hook_init().  If game_clock table exists, select each clock where the
+ * next tick is greater than the current time.
  */
 function game_clock_init() {
   global $game_clocks;
-  $sql = "SELECT * FROM {game_clocks} WHERE status <> 0 AND increment > 0 AND init <> 0 AND next_tick < %d ORDER BY next_tick";
+  $tableok = FALSE;
+  if (db_table_exists("game_clocks")) {
+    $tableok = TRUE;
+  }
+  else {
+    drupal_set_message(t("game_clocks table missing"));
+  }
+  
+  // was $sql = "SELECT * FROM {game_clocks} WHERE status <> 0 AND increment > 0 AND init <> 0 AND next_tick < %d ORDER BY next_tick";
+  $sql = "SELECT * FROM {game_clocks} WHERE status <> 0 AND increment > 0 AND init <> 0 AND next_tick < :current_time";
+
   if ($limit = variable_get('game_clock_limit_on_init', 0)) {
     // TODO Please convert this statement to the D7 database API syntax.
-    $results = db_query_range($sql);
+        // This limits how many clocks to process during a single page load.
+    // Set it if you have a high volume of game clocks and have pages timing out.
+    // starts at record 0, with limit $limit
+    $results = db_query_range($sql, 0, $limit);
   }
   else {
     // TODO Please convert this statement to the D7 database API syntax.
-    $results = db_query($sql, REQUEST_TIME);
+      $results = db_query($sql, array(':current_time' => REQUEST_TIME)); // FIXED
   }
-  while ($result = db_fetch_object($results)) {
+  while ($result = $results->fetchObject()) {
     $game_clocks[$result->name] = $result;
     game_clock_increment($result->name);
   }
