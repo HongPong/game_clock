@@ -6,7 +6,7 @@
  */
 
 /**
- * Implementation of hook_rules_action_info().
+ * Implements hook_rules_action_info().
  */
 function game_clock_field_rules_action_info() {
   $info = array();
@@ -30,12 +30,20 @@ function game_clock_field_rules_action_info() {
   return $info;
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function game_clock_field_rules_action_load($node, $settings) {
   if ($cid = $node->{$settings['field']}[0]['cid']) {
     return array('referenced_game_clock' => game_clock_state($cid, TRUE));
   }
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function game_clock_field_rules_action_load_form($settings, &$form) {
   $settings += array('field' => '');
   $options = content_rules_get_field_names_by_type('game_clock_field');

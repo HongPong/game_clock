@@ -31,7 +31,20 @@ function _game_clock_create($state, $report_errors = FALSE) {
     game_clock_report_error($error, $options, $report_errors, 'error');
     return FALSE;
   }
-  $status = db_query("INSERT INTO {game_clocks} (name, type, title, status, turn, increment, block, init) VALUES ('%s', '%s', '%s', %d, %d, %d, %d, %d)", $state->name, $state->type, $state->title, $state->status, $state->turn, $state->increment, $state->block, $state->init);
+  // TODO Please review the conversion of this statement to the D7 database API syntax.
+  /* db_query("INSERT INTO {game_clocks} (name, type, title, status, turn, increment, block, init) VALUES ('%s', '%s', '%s', %d, %d, %d, %d, %d)", $state->name, $state->type, $state->title, $state->status, $state->turn, $state->increment, $state->block, $state->init) */
+  $status = $id = db_insert('game_clocks')
+  ->fields(array(
+    'name' => $state->name,
+    'type' => $state->type,
+    'title' => $state->title,
+    'status' => $state->status,
+    'turn' => $state->turn,
+    'increment' => $state->increment,
+    'block' => $state->block,
+    'init' => $state->init,
+  ))
+  ->execute();
   if (!$status) {
     $error = 'Creation of the %clock game clock failed for an unknown reason.';
     $options = array('%clock' => $state->title);
@@ -42,7 +55,7 @@ function _game_clock_create($state, $report_errors = FALSE) {
   module_invoke_all('game_clock_create', $state->name, $state);
   $message = 'Created %title game clock.';
   $options = array('%title' => $state->title);
-  $link = l(t('@name', array('@name' => $state->title)), 'admin/settings/game_clock/'. $state->name);
+  $link = l(t('@name', array('@name' => $state->title)), 'admin/config/game_clock/' . $state->name);
   game_clock_report_error($message, $options, $report_errors, 'status', $link);
   return $state;
 }
@@ -68,7 +81,11 @@ function _game_clock_delete($clock, $report_errors = FALSE) {
     game_clock_report_error($error, $options, $report_errors, 'error');
     return FALSE;
   }
-  db_query("DELETE FROM {game_clocks} WHERE cid = %d", $state->cid);
+  // TODO Please review the conversion of this statement to the D7 database API syntax.
+  /* db_query("DELETE FROM {game_clocks} WHERE cid = %d", $state->cid) */
+  db_delete('game_clocks')
+  ->condition('cid', $state->cid)
+  ->execute();
   global $game_clocks;
   unset($game_clocks[$state->name]);
   module_invoke_all('game_clock_delete', $state->name, $state);
@@ -98,13 +115,28 @@ function _game_clock_save($state, $report_errors = FALSE) {
   $state->next_tick = 0;
   if ($state->cid) {
     // Make sure we're trying to save a clock that hasn't been deleted.
-    $test_state = db_fetch_object(db_query("SELECT * FROM {game_clocks} WHERE cid = %d", $state->cid));
+    $test_state = db_fetch_object(db_query("SELECT * FROM {game_clocks} WHERE cid = :cid", array(':cid' => $state->cid)));
     if ($test_state->cid) {
-      $status = db_query("UPDATE {game_clocks} SET name = '%s', type = '%s', title = '%s', status = %d, turn = %d, increment = %d, block = %d, init = %d, next_tick = 0 WHERE cid = %d", $state->name, $state->type, $state->title, $state->status, $state->turn, $state->increment, $state->block, $state->init, $state->cid);
+      // TODO Please review the conversion of this statement to the D7 database API syntax.
+      /* db_query("UPDATE {game_clocks} SET name = '%s', type = '%s', title = '%s', status = %d, turn = %d, increment = %d, block = %d, init = %d, next_tick = 0 WHERE cid = %d", $state->name, $state->type, $state->title, $state->status, $state->turn, $state->increment, $state->block, $state->init, $state->cid) */
+      $status = db_update('game_clocks')
+  ->fields(array(
+    'name' => $state->name,
+    'type' => $state->type,
+    'title' => $state->title,
+    'status' => $state->status,
+    'turn' => $state->turn,
+    'increment' => $state->increment,
+    'block' => $state->block,
+    'init' => $state->init,
+    'next_tick' =>  0,
+  ))
+  ->condition('cid', $state->cid)
+  ->execute();
       if (!$status) {
         $error = 'Saving the %clock game clock failed for an unknown reason.';
         $options = array('%clock' => $state->title);
-        $link = l(t('edit'), 'admin/settings/game_clock/'. $state->name);
+        $link = l(t('edit'), 'admin/config/game_clock/' . $state->name);
         game_clock_report_error($error, $options, $report_errors, 'error', $link);
         return FALSE;
       }
@@ -115,7 +147,10 @@ function _game_clock_save($state, $report_errors = FALSE) {
     }
   }
   $error = 'Tried to save unknown game clock %name (with a CID of %cid).';
-  $options = array('%name' => $state->name, '%cid' => $state->cid);
+  $options = array(
+    '%name' => $state->name,
+    '%cid' => $state->cid,
+  );
   game_clock_report_error($error, $options, $report_errors, 'error');
   return FALSE;
 }

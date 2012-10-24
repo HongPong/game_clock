@@ -13,6 +13,7 @@ function game_clock_list_page() {
   global $game_clock_settings_page_standard_form;
   if ($game_clock_settings_page_standard_form) {
     $output .= drupal_get_form('game_clock_form');
+    // TODO Please change this theme call to use an associative array for the $variables parameter.
     $output .= variable_get('game_clock_settings_form_count', 50) ? theme('pager') : '';
   }
   return $output;
@@ -21,7 +22,7 @@ function game_clock_list_page() {
 /**
  *  Listing of game clocks on top of the admin/settings/game_clock page.
  */
-function game_clock_list_form($form_state) {
+function game_clock_list_form($form, $form_state) {
   if (isset($form_state['values']['selector']) && $form_state['values']['selector'] == 'delete') {
     foreach ($form_state['values']['clocks'] as $clock => $selected) {
       if ($selected['selection']) {
@@ -44,21 +45,43 @@ function game_clock_list_form($form_state) {
   $game_clock_settings_page_standard_form = TRUE;
 
   $game_clocks = array();
+  // TODO Please change this theme call to use an associative array for the $variables parameter.
   $header = array(
     theme('table_select_header_cell'),
-    array('data' => t('Title'), 'field' => 'title', 'sort' => 'asc'),
-    array('data' => t('Type'), 'field' => 'type'),
-    array('data' => t('Status'), 'field' => 'status'),
-    array('data' => t('Turn'), 'field' => 'turn'),
-    array('data' => t('Increment'), 'field' => 'increment'),
-    array('data' => t('Page load'), 'field' => 'init'),
-    t('Ops'));
+    array(
+      'data' => t('Title'),
+      'field' => 'title',
+      'sort' => 'asc',
+    ),
+    array(
+      'data' => t('Type'),
+      'field' => 'type',
+    ),
+    array(
+      'data' => t('Status'),
+      'field' => 'status',
+    ),
+    array(
+      'data' => t('Turn'),
+      'field' => 'turn',
+    ),
+    array(
+      'data' => t('Increment'),
+      'field' => 'increment',
+    ),
+    array(
+      'data' => t('Page load'),
+      'field' => 'init',
+    ),
+    t('Ops'),
+  );
   $sql = "SELECT * FROM {game_clocks}";
   $sql .= tablesort_sql($header);
   if (variable_get('game_clock_settings_form_count', 50)) {
     $results = pager_query($sql, variable_get('game_clock_settings_form_count', 50));
   }
   else {
+    // TODO Please convert this statement to the D7 database API syntax.
     $results = db_query($sql);
   }
   while ($clock = db_fetch_object($results)) {
@@ -96,7 +119,7 @@ function game_clock_list_form($form_state) {
     );
     $form['clocks'][$clock]['title'] = array(
       '#type' => 'item',
-      '#value' => l(t('@title', array('@title' => $state->title)), 'admin/settings/game_clock/'. $clock),
+      '#value' => l(t('@title', array('@title' => $state->title)), 'admin/config/game_clock/' . $clock),
     );
     $form['clocks'][$clock]['type'] = array(
       '#type' => 'item',
@@ -119,11 +142,11 @@ function game_clock_list_form($form_state) {
       '#value' => t('@init', array('@init' => ($state->init ? t('Yes') : t('No')))),
     );
     $ops = array(
-      l(t('edit'), 'admin/settings/game_clock/'. $clock),
-      l(t('pause'), 'admin/settings/game_clock/'. $clock .'/pause'),
-      l(t('start'), 'admin/settings/game_clock/'. $clock .'/start'),
-      l(t('reset'), 'admin/settings/game_clock/'. $clock .'/reset'),
-      l(t('delete'), 'admin/settings/game_clock/'. $clock .'/delete'),
+      l(t('edit'), 'admin/config/game_clock/' . $clock),
+      l(t('pause'), 'admin/config/game_clock/' . $clock . '/pause'),
+      l(t('start'), 'admin/config/game_clock/' . $clock . '/start'),
+      l(t('reset'), 'admin/config/game_clock/' . $clock . '/reset'),
+      l(t('delete'), 'admin/config/game_clock/' . $clock . '/delete'),
     );
     $form['clocks'][$clock]['ops'] = array(
       '#type' => 'item',
@@ -134,14 +157,18 @@ function game_clock_list_form($form_state) {
       '#value' => t('If a game clock has been started, it will increment a turn every time the increment time passes. If %init is set to Yes, then the clock will check for incrementation as appropriate on user page loads. Otherwise, it will check only during the cron run.', array('%init' => t('Page load'))),
     );
     $form['submit'] = array(
-    '#type' => 'submit',
-    '#value' => t('Submit'),
-  );
+      '#type' => 'submit',
+      '#value' => t('Submit'),
+    );
 
   }
   return $form;
 }
 
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
 function game_clock_list_form_submit($form, &$form_state) {
   $clocks = array();
   foreach ($form_state['values']['clocks'] as $clock => $value) {
@@ -187,7 +214,7 @@ function game_clock_delete_form(&$form_state, $clocks) {
     foreach ($clocks as $state) {
       $items[] = t('%clock', array('%clock' => $state->title));
     }
-    $message .= theme('item_list', $items);
+    $message .= theme('item_list', array('items' => $items));
     $message .= t('These game clocks may not be recovered.');
   }
   else {
@@ -198,7 +225,7 @@ function game_clock_delete_form(&$form_state, $clocks) {
     '#value' => $clocks,
   );
   $form['#submit'][] = 'game_clock_delete_form_submit';
-  return confirm_form($form, $title, 'admin/settings/game_clock', $message, t('Delete'));
+  return confirm_form($form, $title, 'admin/config/game_clock', $message, t('Delete'));
 }
 
 /**
@@ -208,7 +235,7 @@ function game_clock_delete_form_submit($form, &$form_state) {
   foreach ($form_state['values']['clocks'] as $clock => $state) {
     game_clock_delete($clock, TRUE);
   }
-  $form_state['redirect'] = 'admin/settings/game_clock';
+  $form_state['redirect'] = 'admin/config/game_clock';
 }
 
 /**
@@ -227,7 +254,7 @@ function game_clock_reset_form(&$form_state, $clocks) {
     foreach ($clocks as $state) {
       $items[] = t('%clock', array('%clock' => $state->title));
     }
-    $message .= theme('item_list', $items);
+    $message .= theme('item_list', array('items' => $items));
     $message .= t('This action may not be undone.');
   }
   else {
@@ -238,7 +265,7 @@ function game_clock_reset_form(&$form_state, $clocks) {
     '#value' => $clocks,
   );
   $form['#submit'][] = 'game_clock_reset_form_submit';
-  return confirm_form($form, $title, 'admin/settings/game_clock', $message, t('Reset'));
+  return confirm_form($form, $title, 'admin/config/game_clock', $message, t('Reset'));
 }
 
 /**
@@ -248,7 +275,7 @@ function game_clock_reset_form_submit($form, &$form_state) {
   foreach ($form_state['values']['clocks'] as $clock => $state) {
     game_clock_reset($clock);
   }
-  $form_state['redirect'] = 'admin/settings/game_clock';
+  $form_state['redirect'] = 'admin/config/game_clock';
 }
 
 /**
@@ -259,7 +286,7 @@ function game_clock_edit_page($clock) {
   if (!$clock->cid) {
     drupal_not_found();
   }
-  drupal_set_title(t('Edit @clock', array('@clock' => $clock->title)));
+  drupal_set_title(t('Edit @clock', array('@clock' => $clock->title)), PASS_THROUGH);
   return drupal_get_form('game_clock_form', $clock);
 }
 
@@ -270,7 +297,7 @@ function game_clock_edit_page($clock) {
 function game_clock_pause_page($clock) {
   game_clock_pause($clock->name);
   drupal_set_message(t("Paused the %clock game clock.", array('%clock' => $clock->title)));
-  drupal_goto('admin/settings/game_clock');
+  drupal_goto('admin/config/game_clock');
 }
 
 /**
@@ -280,13 +307,13 @@ function game_clock_pause_page($clock) {
 function game_clock_start_page($clock) {
   game_clock_start($clock->name);
   drupal_set_message(t("Started the %clock game clock.", array('%clock' => $clock->title)));
-  drupal_goto('admin/settings/game_clock');
+  drupal_goto('admin/config/game_clock');
 }
 
 /**
  *  Define the form to create a new game clock.
  */
-function game_clock_form($form_state, $clock = NULL) {
+function game_clock_form($form, $form_state, $clock = NULL) {
   $clock = (object) $clock;
   $form = array();
   $form['clock'] = array(
@@ -364,7 +391,18 @@ function game_clock_form($form_state, $clock = NULL) {
  */
 function game_clock_settings() {
   // This creates a list of the number of clocks to limit.
-  $options = array(0 => 'All', 1 => 1, 5 => 5, 10 => 10, 25 => 25, 50 => 50, 100 => 100, 250 => 250, 500 => 500, 1000 => 1000);
+  $options = array(
+    0 => 'All',
+    1 => 1,
+    5 => 5,
+    10 => 10,
+    25 => 25,
+    50 => 50,
+    100 => 100,
+    250 => 250,
+    500 => 500,
+    1000 => 1000,
+  );
   $form = array();
   $form['game_clock_settings_form_count'] = array(
     '#type' => 'select',
@@ -447,7 +485,7 @@ function game_clock_form_submit($form, &$form_state) {
 
       // If we changed the name, then redirect to the new edit page.
       if ($state && ($old_name != $state->name)) {
-        drupal_goto('admin/settings/game_clock/'. $state->name);
+        drupal_goto('admin/config/game_clock/' . $state->name);
       }
     }
   }
@@ -517,7 +555,8 @@ function _game_clock_selections($increment = NULL) {
 /**
  *  Render the form as a table of clock settings and ops.
  */
-function theme_game_clock_settings_form($form) {
+function theme_game_clock_settings_form($variables) {
+  $form = $variables['form'];
   $output .= drupal_render($form['selector']);
   $header = $form['table_header']['#value'];
   $rows = array();
@@ -533,8 +572,8 @@ function theme_game_clock_settings_form($form) {
     $cells[] = drupal_render($form['clocks'][$clock]['ops']);
     $rows[] = $cells;
   }
-  $output .= theme('table', $header, $rows);
-  $output .= drupal_render($form);
+  $output .= theme('table', array('header' => $header, 'rows' => $rows));
+  $output .= drupal_render_children($form);
 
   return $output;
 }

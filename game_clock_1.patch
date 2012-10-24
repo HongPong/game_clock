@@ -1,0 +1,382 @@
+diff -up -r game_clock.install game_clock.install
+--- game_clock.install	2012-10-22 18:53:56.438584321 -0500
++++ game_clock.install	2012-10-22 19:00:37.666570150 -0500
+@@ -114,7 +114,7 @@ function game_clock_schema() {
+     ),
+     'primary key' => array('cid'),
+     'unique keys' => array(
+-      'name' => array('name')
++      'name' => array('name'),
+     ),
+   );
+ 
+@@ -126,11 +126,11 @@ function game_clock_schema() {
+  */
+ function game_clock_update_6001() {
+   db_add_field($ret, 'game_clocks', 'type', array(
+-      'type' => 'varchar',
+-      'length' => '32',
+-      'not null' => FALSE,
+-      'default' => '',
+-    ));
++    'type' => 'varchar',
++    'length' => '32',
++    'not null' => FALSE,
++    'default' => '',
++  ));
+   menu_rebuild();
+   return $ret;
+ }
+diff -up -r game_clock.module game_clock.module
+--- game_clock.module	2012-10-22 18:53:56.438584321 -0500
++++ game_clock.module	2012-10-22 19:00:37.774570146 -0500
+@@ -42,7 +42,7 @@ function game_clock_pause($clock = 'defa
+     global $game_clocks;
+     $game_clocks[$clock]->status = $status;
+     db_query('UPDATE {game_clocks} SET status = %d WHERE cid = %d', $status, $state->cid);
+-    module_invoke_all('game_clock_'. ($status ? 'start' : 'pause'), $clock, $game_clocks[$clock]);
++    module_invoke_all('game_clock_' . ($status ? 'start' : 'pause'), $clock, $game_clocks[$clock]);
+     game_clock_increment($clock);
+   }
+ }
+diff -up -r includes/game_clock.admin.inc includes/game_clock.admin.inc
+--- includes/game_clock.admin.inc	2012-10-22 18:53:56.442584322 -0500
++++ includes/game_clock.admin.inc	2012-10-22 19:00:38.078570133 -0500
+@@ -46,13 +46,33 @@ function game_clock_list_form($form_stat
+   $game_clocks = array();
+   $header = array(
+     theme('table_select_header_cell'),
+-    array('data' => t('Title'), 'field' => 'title', 'sort' => 'asc'),
+-    array('data' => t('Type'), 'field' => 'type'),
+-    array('data' => t('Status'), 'field' => 'status'),
+-    array('data' => t('Turn'), 'field' => 'turn'),
+-    array('data' => t('Increment'), 'field' => 'increment'),
+-    array('data' => t('Page load'), 'field' => 'init'),
+-    t('Ops'));
++    array(
++      'data' => t('Title'),
++      'field' => 'title',
++      'sort' => 'asc',
++    ),
++    array(
++      'data' => t('Type'),
++      'field' => 'type',
++    ),
++    array(
++      'data' => t('Status'),
++      'field' => 'status',
++    ),
++    array(
++      'data' => t('Turn'),
++      'field' => 'turn',
++    ),
++    array(
++      'data' => t('Increment'),
++      'field' => 'increment',
++    ),
++    array(
++      'data' => t('Page load'),
++      'field' => 'init',
++    ),
++    t('Ops'),
++  );
+   $sql = "SELECT * FROM {game_clocks}";
+   $sql .= tablesort_sql($header);
+   if (variable_get('game_clock_settings_form_count', 50)) {
+@@ -96,7 +116,7 @@ function game_clock_list_form($form_stat
+     );
+     $form['clocks'][$clock]['title'] = array(
+       '#type' => 'item',
+-      '#value' => l(t('@title', array('@title' => $state->title)), 'admin/settings/game_clock/'. $clock),
++      '#value' => l(t('@title', array('@title' => $state->title)), 'admin/settings/game_clock/' . $clock),
+     );
+     $form['clocks'][$clock]['type'] = array(
+       '#type' => 'item',
+@@ -119,11 +139,11 @@ function game_clock_list_form($form_stat
+       '#value' => t('@init', array('@init' => ($state->init ? t('Yes') : t('No')))),
+     );
+     $ops = array(
+-      l(t('edit'), 'admin/settings/game_clock/'. $clock),
+-      l(t('pause'), 'admin/settings/game_clock/'. $clock .'/pause'),
+-      l(t('start'), 'admin/settings/game_clock/'. $clock .'/start'),
+-      l(t('reset'), 'admin/settings/game_clock/'. $clock .'/reset'),
+-      l(t('delete'), 'admin/settings/game_clock/'. $clock .'/delete'),
++      l(t('edit'), 'admin/settings/game_clock/' . $clock),
++      l(t('pause'), 'admin/settings/game_clock/' . $clock . '/pause'),
++      l(t('start'), 'admin/settings/game_clock/' . $clock . '/start'),
++      l(t('reset'), 'admin/settings/game_clock/' . $clock . '/reset'),
++      l(t('delete'), 'admin/settings/game_clock/' . $clock . '/delete'),
+     );
+     $form['clocks'][$clock]['ops'] = array(
+       '#type' => 'item',
+@@ -134,9 +154,9 @@ function game_clock_list_form($form_stat
+       '#value' => t('If a game clock has been started, it will increment a turn every time the increment time passes. If %init is set to Yes, then the clock will check for incrementation as appropriate on user page loads. Otherwise, it will check only during the cron run.', array('%init' => t('Page load'))),
+     );
+     $form['submit'] = array(
+-    '#type' => 'submit',
+-    '#value' => t('Submit'),
+-  );
++      '#type' => 'submit',
++      '#value' => t('Submit'),
++    );
+ 
+   }
+   return $form;
+@@ -364,7 +384,18 @@ function game_clock_form($form_state, $c
+  */
+ function game_clock_settings() {
+   // This creates a list of the number of clocks to limit.
+-  $options = array(0 => 'All', 1 => 1, 5 => 5, 10 => 10, 25 => 25, 50 => 50, 100 => 100, 250 => 250, 500 => 500, 1000 => 1000);
++  $options = array(
++    0 => 'All',
++    1 => 1,
++    5 => 5,
++    10 => 10,
++    25 => 25,
++    50 => 50,
++    100 => 100,
++    250 => 250,
++    500 => 500,
++    1000 => 1000,
++  );
+   $form = array();
+   $form['game_clock_settings_form_count'] = array(
+     '#type' => 'select',
+@@ -447,7 +478,7 @@ function game_clock_form_submit($form, &
+ 
+       // If we changed the name, then redirect to the new edit page.
+       if ($state && ($old_name != $state->name)) {
+-        drupal_goto('admin/settings/game_clock/'. $state->name);
++        drupal_goto('admin/settings/game_clock/' . $state->name);
+       }
+     }
+   }
+diff -up -r includes/game_clock.inc includes/game_clock.inc
+--- includes/game_clock.inc	2012-10-22 18:53:56.442584322 -0500
++++ includes/game_clock.inc	2012-10-22 19:00:38.142570133 -0500
+@@ -42,7 +42,7 @@ function _game_clock_create($state, $rep
+   module_invoke_all('game_clock_create', $state->name, $state);
+   $message = 'Created %title game clock.';
+   $options = array('%title' => $state->title);
+-  $link = l(t('@name', array('@name' => $state->title)), 'admin/settings/game_clock/'. $state->name);
++  $link = l(t('@name', array('@name' => $state->title)), 'admin/settings/game_clock/' . $state->name);
+   game_clock_report_error($message, $options, $report_errors, 'status', $link);
+   return $state;
+ }
+@@ -104,7 +104,7 @@ function _game_clock_save($state, $repor
+       if (!$status) {
+         $error = 'Saving the %clock game clock failed for an unknown reason.';
+         $options = array('%clock' => $state->title);
+-        $link = l(t('edit'), 'admin/settings/game_clock/'. $state->name);
++        $link = l(t('edit'), 'admin/settings/game_clock/' . $state->name);
+         game_clock_report_error($error, $options, $report_errors, 'error', $link);
+         return FALSE;
+       }
+@@ -115,7 +115,10 @@ function _game_clock_save($state, $repor
+     }
+   }
+   $error = 'Tried to save unknown game clock %name (with a CID of %cid).';
+-  $options = array('%name' => $state->name, '%cid' => $state->cid);
++  $options = array(
++    '%name' => $state->name,
++    '%cid' => $state->cid,
++  );
+   game_clock_report_error($error, $options, $report_errors, 'error');
+   return FALSE;
+ }
+diff -up -r includes/game_clock.theme.inc includes/game_clock.theme.inc
+--- includes/game_clock.theme.inc	2012-10-22 18:53:56.442584322 -0500
++++ includes/game_clock.theme.inc	2012-10-22 19:00:38.178570132 -0500
+@@ -14,7 +14,7 @@ function theme_game_clock_block($clock =
+   $state = game_clock_state($clock);
+   $output = t('Turn: @turn', array('@turn' => $state->turn));
+   if (!$state->status) {
+-    $output .= ' <span>'. t('(paused)') .'</span>';
++    $output .= ' <span>' . t('(paused)') . '</span>';
+   }
+   return $output;
+ }
+diff -up -r modules/game_clock_field/game_clock_field.module modules/game_clock_field/game_clock_field.module
+--- modules/game_clock_field/game_clock_field.module	2012-10-22 18:53:56.438584321 -0500
++++ modules/game_clock_field/game_clock_field.module	2012-10-22 19:00:38.582570115 -0500
+@@ -14,7 +14,7 @@ function game_clock_field_menu() {
+     'title' => 'Game clock field autocomplete',
+     'page callback' => 'game_clock_field_autocomplete',
+     'access arguments' => array('access content'),
+-    'type' => MENU_CALLBACK
++    'type' => MENU_CALLBACK,
+   );
+   return $items;
+ }
+@@ -118,11 +118,11 @@ function game_clock_field_field_settings
+ 
+         if (count($views) > 1) {
+           $form['advanced'] = array(
+-             '#type' => 'fieldset',
+-             '#title' => t('Advanced - Game clocks that can be referenced (View)'),
+-             '#collapsible' => TRUE,
+-             '#collapsed' => !isset($field['advanced_view']) || $field['advanced_view'] == '--',
+-           );
++            '#type' => 'fieldset',
++            '#title' => t('Advanced - Game clocks that can be referenced (View)'),
++            '#collapsible' => TRUE,
++            '#collapsed' => !isset($field['advanced_view']) || $field['advanced_view'] == '--',
++          );
+           $form['advanced']['advanced_view'] = array(
+             '#type' => 'select',
+             '#title' => t('View used to select the game clocks'),
+@@ -151,7 +151,11 @@ function game_clock_field_field_settings
+ 
+     case 'database columns':
+       $columns = array(
+-        'cid' => array('type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE),
++        'cid' => array(
++          'type' => 'int',
++          'unsigned' => TRUE,
++          'not null' => FALSE,
++        ),
+       );
+       return $columns;
+ 
+@@ -161,12 +165,12 @@ function game_clock_field_field_settings
+       $table_alias = content_views_tablename($field);
+ 
+       // Filter: swap the handler to the 'in' operator.
+-      $data[$table_alias][$field['field_name'] .'_cid']['filter']['handler'] = 'content_handler_filter_many_to_one';
++      $data[$table_alias][$field['field_name'] . '_cid']['filter']['handler'] = 'content_handler_filter_many_to_one';
+       // Argument: use game_clock.title for summaries.
+-      $data[$table_alias][$field['field_name'] .'_cid']['argument']['name table'] = 'game_clock';
+-      $data[$table_alias][$field['field_name'] .'_cid']['argument']['name field'] = 'title';
++      $data[$table_alias][$field['field_name'] . '_cid']['argument']['name table'] = 'game_clock';
++      $data[$table_alias][$field['field_name'] . '_cid']['argument']['name field'] = 'title';
+       // Relationship: add a relationship for related game clock.
+-      $data[$table_alias][$field['field_name'] .'_cid']['relationship'] = array(
++      $data[$table_alias][$field['field_name'] . '_cid']['relationship'] = array(
+         'base' => 'game_clock',
+         'field' => $db_info['columns']['cid']['column'],
+         'handler' => 'content_handler_relationship',
+@@ -194,7 +198,9 @@ function game_clock_field_field($op, &$n
+       foreach ($items as $delta => $item) {
+         if (is_array($item)) {
+           $error_element = isset($item['_error_element']) ? $item['_error_element'] : '';
+-          if (is_array($item) && isset($item['_error_element'])) unset($item['_error_element']);
++          if (is_array($item) && isset($item['_error_element'])) {
++            unset($item['_error_element']);
++          }
+           if (!empty($item['cid']) && !isset($refs[$item['cid']])) {
+             form_set_error($error_element, t("%name: this game clock can't be referenced.", array('%name' => t($field['widget']['label']))));
+           }
+@@ -281,7 +287,7 @@ function theme_game_clock_field_formatte
+   $output = '';
+   if (!empty($element['#item']['cid']) && is_numeric($element['#item']['cid']) && ($title = _game_clock_field_titles($element['#item']['cid']))) {
+     $state = game_clock_state($element['#item']['cid'], TRUE);
+-    $output = l(t('%title', array('%title' => $state->title)), 'admin/settings/game_clock/'. $state->name);
++    $output = l(t('%title', array('%title' => $state->title)), 'admin/settings/game_clock/' . $state->name);
+   }
+   return $output;
+ }
+@@ -385,21 +391,24 @@ function game_clock_field_elements() {
+   return array(
+     'game_clock_field_select' => array(
+       '#input' => TRUE,
+-      '#columns' => array('uid'), '#delta' => 0,
++      '#columns' => array('uid'),
++      '#delta' => 0,
+       '#process' => array('game_clock_field_select_process'),
+     ),
+     'game_clock_field_buttons' => array(
+       '#input' => TRUE,
+-      '#columns' => array('uid'), '#delta' => 0,
++      '#columns' => array('uid'),
++      '#delta' => 0,
+       '#process' => array('game_clock_field_buttons_process'),
+     ),
+     'game_clock_field_autocomplete' => array(
+       '#input' => TRUE,
+-      '#columns' => array('name'), '#delta' => 0,
++      '#columns' => array('name'),
++      '#delta' => 0,
+       '#process' => array('game_clock_field_autocomplete_process'),
+       '#autocomplete_path' => FALSE,
+-      ),
+-    );
++    ),
++  );
+ }
+ 
+ /**
+@@ -423,7 +432,10 @@ function game_clock_field_widget_setting
+         );
+       }
+       else {
+-        $form['autocomplete_match'] = array('#type' => 'hidden', '#value' => $match);
++        $form['autocomplete_match'] = array(
++          '#type' => 'hidden',
++          '#value' => $match,
++        );
+       }
+       return $form;
+ 
+@@ -500,7 +512,7 @@ function game_clock_field_autocomplete_v
+   if (!empty($element['#default_value'][$field_key])) {
+     $nid = $element['#default_value'][$field_key];
+     $value = db_result(db_query('SELECT c.title FROM {game_clocks} c WHERE c.cid = %d', $cid));
+-    $value .= ' [cid:'. $cid .']';
++    $value .= ' [cid:' . $cid . ']';
+     return array($field_key => $value);
+   }
+   return array($field_key => NULL);
+@@ -592,7 +604,7 @@ function game_clock_field_autocomplete_p
+   $element[$field_key] = array(
+     '#type' => 'text_textfield',
+     '#default_value' => isset($element['#value']) ? $element['#value'] : '',
+-    '#autocomplete_path' => 'game_clock_field/autocomplete/'. $element['#field_name'],
++    '#autocomplete_path' => 'game_clock_field/autocomplete/' . $element['#field_name'],
+     // The following values were set by the content module and need
+     // to be passed down to the nested element.
+     '#title' => $element['#title'],
+@@ -739,7 +751,7 @@ function _game_clock_field_potential_ref
+   static $results = array();
+ 
+   // Create unique id for static cache.
+-  $cid = $field['field_name'] .':'. $match .':'. ($string !== '' ? $string : implode('-', $ids)) .':'. $limit;
++  $cid = $field['field_name'] . ':' . $match . ':' . ($string !== '' ? $string : implode('-', $ids)) . ':' . $limit;
+   if (!isset($results[$cid])) {
+     $references = FALSE;
+     if (module_exists('views') && !empty($field['advanced_view']) && $field['advanced_view'] != '--') {
+@@ -865,7 +877,7 @@ function _game_clock_field_potential_ref
+       'equals' => "= '%s'",
+       'starts_with' => "LIKE '%s%%'",
+     );
+-    $where[] = 'c.title '. (isset($match_operators[$match]) ? $match_operators[$match] : $match_operators['contains']);
++    $where[] = 'c.title ' . (isset($match_operators[$match]) ? $match_operators[$match] : $match_operators['contains']);
+     $args[] = $string;
+   }
+   elseif ($ids) {
+@@ -873,7 +885,7 @@ function _game_clock_field_potential_ref
+     $args = array_merge($args, $ids);
+   }
+ 
+-  $where_clause = $where ? 'WHERE ('. implode(') AND (', $where) .')' : '';
++  $where_clause = $where ? 'WHERE (' . implode(') AND (', $where) . ')' : '';
+   $sql = "SELECT c.cid, c.title AS game_clock_title, c.type AS game_clock_type FROM {game_clocks} c $where_clause ORDER BY c.title, c.type";
+   $result = $limit ? db_query_range($sql, $args, 0, $limit) : db_query($sql, $args);
+   $references = array();
+@@ -899,7 +911,7 @@ function game_clock_field_autocomplete($
+   $references = _game_clock_field_potential_references($field, $string, $match, array(), 10);
+   foreach ($references as $id => $row) {
+     // Add a class wrapper for a few required CSS overrides.
+-    $matches[$row['title'] ." [cid:$id]"] = '<div class="reference-autocomplete">'. $row['rendered'] . '</div>';
++    $matches[$row['title'] . " [cid:$id]"] = '<div class="reference-autocomplete">' . $row['rendered'] . '</div>';
+   }
+   drupal_json($matches);
+ }
+@@ -940,7 +952,7 @@ function game_clock_field_preprocess_nod
+     $node = $vars['node'];
+     $field = $node->referencing_field;
+     $vars['template_files'][] = 'node-game_clock_field';
+-    $vars['template_files'][] = 'node-game_clock_field-'. $field['field_name'];
++    $vars['template_files'][] = 'node-game_clock_field-' . $field['field_name'];
+ //     $vars['template_files'][] = 'node-game_clock_field-'. $node->type;
+ //     $vars['template_files'][] = 'node-game_clock_field-'. $field['field_name'] .'-'. $node->type;
+   }

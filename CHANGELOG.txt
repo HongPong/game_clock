@@ -1,4 +1,9 @@
 
+October 2009
+------------
+by aaron: Add game_clock_current_turn($clock).
+by aaron: Allow game_clock_state/load to autoparse clock names or cid.
+
 January 2009
 ------------
  * Change module name and package (aaron).

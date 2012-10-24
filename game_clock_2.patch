@@ -1,0 +1,1138 @@
+diff -up -r game_clock.info game_clock.info
+--- game_clock.info	2012-10-22 19:06:39.538557365 -0500
++++ game_clock.info	2012-10-22 19:13:07.406543664 -0500
+@@ -1,11 +1,11 @@
+ name = Game Utility Clock
+ description = Increment game turns automatically.
+-core = 6.x
++core = 7.x
+ package = Game Utilities
+ 
+ ; Information added by drupal.org packaging script on 2011-02-25
+ version = "6.x-1.x-dev"
+-core = "6.x"
++core = 7.x
+ project = "game_clock"
+ datestamp = "1298619320"
+ 
+diff -up -r game_clock.install game_clock.install
+--- game_clock.install	2012-10-22 19:12:09.978545692 -0500
++++ game_clock.install	2012-10-22 19:13:07.446543664 -0500
+@@ -6,17 +6,28 @@
+  */
+ 
+ /**
+- * Implementation of hook_install().
++ * Implements hook_install().
+  */
+ function game_clock_install() {
+-  $success = drupal_install_schema('game_clock');
++  // TODO The drupal_(un)install_schema functions are called automatically in D7.
++  $success = array()/*drupal_install_schema('game_clock')*/;
+ 
+   if ($success) {
+     // Insert a starting record.
+     // Note that UI strings in the following SQL, e.g. "Default", aren't
+     // wrapped in t() and that's intentional: they are passed to t() later,
+     // thus allowing for multilingual sites.
+-    db_query("INSERT INTO {game_clocks} (name, title, increment, block, init) VALUES ('default', 'Default', 15, 1, 1)");
++    // TODO Please review the conversion of this statement to the D7 database API syntax.
++    /* db_query("INSERT INTO {game_clocks} (name, title, increment, block, init) VALUES ('default', 'Default', 15, 1, 1)") */
++    $id = db_insert('game_clocks')
++  ->fields(array(
++      'name' => 'default',
++      'title' => 'Default',
++      'increment' => 15,
++      'block' => 1,
++      'init' => 1,
++    ))
++  ->execute();
+   }
+ 
+   if ($success) {
+@@ -28,10 +39,12 @@ function game_clock_install() {
+ }
+ 
+ /**
+- * Implementation of hook_uninstall().
++ * Implements hook_uninstall().
+  */
+ function game_clock_uninstall() {
+-  drupal_uninstall_schema('game_clock');
++  // TODO The drupal_(un)install_schema functions are called automatically in D7.
++  // drupal_uninstall_schema('game_clock')
++  // TODO Please convert this statement to the D7 database API syntax.
+   $result = db_query("SELECT name FROM {variable} WHERE name LIKE 'game_clock_%'");
+   while ($row = db_fetch_object($result)) {
+     variable_del($row->name);
+@@ -41,7 +54,7 @@ function game_clock_uninstall() {
+ }
+ 
+ /**
+- * Implementation of hook_schema().
++ * Implements hook_schema().
+  */
+ function game_clock_schema() {
+   $schema = array();
+@@ -125,12 +138,15 @@ function game_clock_schema() {
+  *  Add the 'type' field to game clocks.
+  */
+ function game_clock_update_6001() {
+-  db_add_field($ret, 'game_clocks', 'type', array(
++  db_add_field('game_clocks', 'type', array(
+     'type' => 'varchar',
+     'length' => '32',
+     'not null' => FALSE,
+     'default' => '',
+   ));
+   menu_rebuild();
+-  return $ret;
++  // hook_update_N() no longer returns a $ret array. Instead, return
++  // nothing or a translated string indicating the update ran successfully.
++  // See http://drupal.org/node/224333#update_sql.
++  return t('TODO Add a descriptive string here to show in the UI.') /* $ret */;
+ }
+diff -up -r game_clock.module game_clock.module
+--- game_clock.module	2012-10-22 19:12:09.978545692 -0500
++++ game_clock.module	2012-10-22 19:13:07.614543658 -0500
+@@ -10,11 +10,11 @@
+  */
+ 
+ /**
+- *  Implements hook_help().
++ * Implements hook_help().
+  */
+ function game_clock_help($section) {
+   switch ($section) {
+-    case 'admin/settings/game_clock':
++    case 'admin/config/game_clock':
+       return t("
+         <p>Game clocks may be used for various purposes, such as keeping an in-game calendar, tracking game effects and events, and limiting characters to acting at a slower pace suitable for a web-based game.</p>
+         <p>You may view all active game clocks from this page, as well as create new clocks below. Additionally, you can create new game clocks programmatically with the API provided with the Game Clock module. See the !help page for more information.</p>
+@@ -41,7 +41,14 @@ function game_clock_pause($clock = 'defa
+   if ($state->status != $status) {
+     global $game_clocks;
+     $game_clocks[$clock]->status = $status;
+-    db_query('UPDATE {game_clocks} SET status = %d WHERE cid = %d', $status, $state->cid);
++    // TODO Please review the conversion of this statement to the D7 database API syntax.
++    /* db_query('UPDATE {game_clocks} SET status = %d WHERE cid = %d', $status, $state->cid) */
++    db_update('game_clocks')
++  ->fields(array(
++      'status' => $status,
++    ))
++  ->condition('cid', $state->cid)
++  ->execute();
+     module_invoke_all('game_clock_' . ($status ? 'start' : 'pause'), $clock, $game_clocks[$clock]);
+     game_clock_increment($clock);
+   }
+@@ -81,14 +88,14 @@ function game_clock_increment($clock = '
+   }
+ 
+   // If it's time for the next tick, or if we're manually incrementing the clock, then increment.
+-  if (($state->increment && (time() >= ($state->next_tick))) || $force) {
++  if (($state->increment && (REQUEST_TIME >= ($state->next_tick))) || $force) {
+     global $game_clocks;
+ 
+     // If the clock has run in the past, then figure out how many turns we've missed.
+     // This ensures the clock represents the correct tick.
+ 
+     // First, get the number of seconds passed since it should have ticked.
+-    $passed = time() - $game_clocks[$clock]->next_tick;
++    $passed = REQUEST_TIME - $game_clocks[$clock]->next_tick;
+ 
+     // The number of ticks will equal the number of seconds passed divided by the increment, rounding down and adding one.
+     $game_clocks[$clock]->ticks = ($game_clocks[$clock]->next_tick ? floor($passed / $game_clocks[$clock]->increment) : 0) + 1;
+@@ -99,12 +106,20 @@ function game_clock_increment($clock = '
+     if ($game_clocks[$clock]->increment) {
+       // Record the next turn that we should increment the clock.
+       // Subtract the amount left over from our earlier $passed division for better accuracy.
+-      $game_clocks[$clock]->next_tick = time() + $game_clocks[$clock]->increment - fmod($passed, $game_clocks[$clock]->increment);
++      $game_clocks[$clock]->next_tick = REQUEST_TIME + $game_clocks[$clock]->increment - fmod($passed, $game_clocks[$clock]->increment);
+     }
+ 
+     // Store the clock state to the database. Note that we don't store the ->ticks,
+     // but they'll be passed to the modules in the next step.
+-    db_query("UPDATE {game_clocks} SET turn = %d, next_tick = %d WHERE cid = %d", $game_clocks[$clock]->turn, $game_clocks[$clock]->next_tick, $game_clocks[$clock]->cid);
++    // TODO Please review the conversion of this statement to the D7 database API syntax.
++    /* db_query("UPDATE {game_clocks} SET turn = %d, next_tick = %d WHERE cid = %d", $game_clocks[$clock]->turn, $game_clocks[$clock]->next_tick, $game_clocks[$clock]->cid) */
++    db_update('game_clocks')
++  ->fields(array(
++      'turn' => $game_clocks[$clock]->turn,
++      'next_tick' => $game_clocks[$clock]->next_tick,
++    ))
++  ->condition('cid', $game_clocks[$clock]->cid)
++  ->execute();
+ 
+     // Invoke hook_game_clock_increment. Note that we pass ->ticks, so the modules know how many
+     // ticks have actually passed, rather than necessarily incrementing for every tick.
+@@ -132,7 +147,15 @@ function game_clock_reset($clock = 'defa
+   $state = game_clock_state($clock);
+   $game_clocks[$clock]->turn = isset($turn) ? $turn : 0;
+   $game_clocks[$clock]->next_tick = 0;
+-  db_query("UPDATE {game_clocks} SET turn = %d, next_tick = %d WHERE cid = %d", $game_clocks[$clock]->turn, $game_clocks[$clock]->next_tick, $game_clocks[$clock]->cid);
++  // TODO Please review the conversion of this statement to the D7 database API syntax.
++  /* db_query("UPDATE {game_clocks} SET turn = %d, next_tick = %d WHERE cid = %d", $game_clocks[$clock]->turn, $game_clocks[$clock]->next_tick, $game_clocks[$clock]->cid) */
++  db_update('game_clocks')
++  ->fields(array(
++    'turn' => $game_clocks[$clock]->turn,
++    'next_tick' => $game_clocks[$clock]->next_tick,
++  ))
++  ->condition('cid', $game_clocks[$clock]->cid)
++  ->execute();
+   module_invoke_all('game_clock_reset', $clock, $game_clocks[$clock]);
+   game_clock_increment($clock);
+ }
+@@ -237,7 +260,7 @@ function game_clock_state($clock = NULL,
+         return $state;
+       }
+     }
+-    $result = db_fetch_object(db_query("SELECT * FROM {game_clocks} WHERE cid = %d", $clock));
++    $result = db_fetch_object(db_query("SELECT * FROM {game_clocks} WHERE cid = :cid", array(':cid' => $clock)));
+     if ($result->cid) {
+       $game_clocks[$result->name] = $result;
+       return $result;
+@@ -246,7 +269,7 @@ function game_clock_state($clock = NULL,
+   }
+ 
+   if (!isset($game_clocks[$clock])) {
+-    $results = db_query('SELECT * FROM {game_clocks} WHERE name = "%s"', $clock);
++    $results = db_query('SELECT * FROM {game_clocks} WHERE name = :name', array(':name' => $clock));
+     while ($result = db_fetch_object($results)) {
+       $game_clocks[$result->name] = $result;
+     }
+@@ -266,7 +289,7 @@ function game_clock_type_states($type =
+   global $game_clocks;
+ 
+   $clocks = array();
+-  $results = db_query("SELECT * FROM {game_clocks} WHERE type = '%s'", $type);
++  $results = db_query("SELECT * FROM {game_clocks} WHERE type = :type", array(':type' => $type));
+   while ($state = db_fetch_object($results)) {
+     $game_clocks[$state->name] = $clocks[$state->name] = $state;
+   }
+@@ -287,16 +310,18 @@ function game_clock_current_turn($clock
+ }
+ 
+ /**
+- *  Implements hook_init().
++ * Implements hook_init().
+  */
+ function game_clock_init() {
+   global $game_clocks;
+   $sql = "SELECT * FROM {game_clocks} WHERE status <> 0 AND increment > 0 AND init <> 0 AND next_tick < %d ORDER BY next_tick";
+   if ($limit = variable_get('game_clock_limit_on_init', 0)) {
+-    $results = db_query_range($sql, 0, $limit);
++    // TODO Please convert this statement to the D7 database API syntax.
++    $results = db_query_range($sql);
+   }
+   else {
+-    $results = db_query($sql, time());
++    // TODO Please convert this statement to the D7 database API syntax.
++    $results = db_query($sql, REQUEST_TIME);
+   }
+   while ($result = db_fetch_object($results)) {
+     $game_clocks[$result->name] = $result;
+@@ -305,16 +330,18 @@ function game_clock_init() {
+ }
+ 
+ /**
+- *  Implements hook_cron().
++ * Implements hook_cron().
+  */
+ function game_clock_cron() {
+   global $game_clocks;
+   $sql = "SELECT * FROM {game_clocks} WHERE status <> 0 AND increment > 0 AND next_tick < %d ORDER BY next_tick";
+   if ($limit = variable_get('game_clock_limit_on_cron', 0)) {
+-    $results = db_query_range($sql, 0, $limit);
++    // TODO Please convert this statement to the D7 database API syntax.
++    $results = db_query_range($sql);
+   }
+   else {
+-    $results = db_query($sql, time());
++    // TODO Please convert this statement to the D7 database API syntax.
++    $results = db_query($sql, REQUEST_TIME);
+   }
+   while ($result = db_fetch_object($results)) {
+     $game_clocks[$result->name] = $result;
+@@ -323,7 +350,7 @@ function game_clock_cron() {
+ }
+ 
+ /**
+- *  Implements hook_menu().
++ * Implements hook_menu().
+  */
+ function game_clock_menu() {
+   module_load_include('inc', 'game_clock', 'includes/game_clock.menu');
+@@ -331,59 +358,76 @@ function game_clock_menu() {
+ }
+ 
+ /**
+- *  Implement hook_load() (for menu, not for node).
++ * Implements hook_load() (for menu, not for node)().
+  *  Helper function for menu: this loads the %game_clock argument.
+  */
+-function game_clock_load($clock, $is_cid = NULL) {
+-  return game_clock_state($clock, $is_cid);
++function game_clock_load($clocks, $is_cid = NULL) {
++  foreach ($clocks as $nid => &$clock) {
++    $node_additions = game_clock_state($clock, $is_cid);
++    foreach ($node_additions as $property => &$value) {
++      $clock->$property = $value;
++    }
++  }
+ }
+ 
+ /**
+- *  Implements hook_perm().
++ * Implements hook_permission().
+  */
+-function game_clock_perm() {
+-  return array('administer game clock');
++function game_clock_permission() {
++  return array(
++    'administer game clock' => array(
++      'title' => t('administer game clock'),
++      'description' => t('TODO Add a description for \'administer game clock\''),
++    ),
++  );
+ }
+ 
+ /**
+- *  Implements hook_block().
++ * Implements hook_block_info().
+  */
+-function game_clock_block($op = 'list', $delta = 'default', $edit = array()) {
+-  switch ($op) {
+-    case 'list':
+-      $blocks = array();
+-      foreach (game_clock_state() as $game => $state) {
+-        // Only make a block available if it's been checked on the game clock administration page.
+-        if ($state->block) {
+-          $blocks[$game] = array(
+-            'info' => t('Game clock: @title', array('@title' => $state->title)),
+-          );
+-        }
+-      }
+-      return $blocks;
+-    case 'view':
+-      $state = game_clock_state($delta);
+-      if ($state->cid) {
+-        $block = array(
+-          'subject' => t('@title', array('@title' => $state->title)),
+-          'content' => theme('game_clock_block', $delta),
+-        );
+-      }
+-      return $block;
++function game_clock_block_info() {
++  $blocks = array();
++  foreach (game_clock_state() as $game => $state) {
++    // Only make a block available if it's been checked on the game clock administration page.
++    if ($state->block) {
++      $blocks[$game] = array(
++        'info' => t('Game clock: @title', array('@title' => $state->title)),
++      );
++    }
+   }
++  return $blocks;
+ }
+ 
+ /**
+- *  Implements hook_theme().
++ * Implements hook_block_view().
++ */
++function game_clock_block_view($delta) {
++  $state = game_clock_state($delta);
++  if ($state->cid) {
++    $block = array(
++      'subject' => t('@title', array('@title' => $state->title)),
++      'content' => theme('game_clock_block', array('clock' => $delta)),
++    );
++  }
++  return $block;
++}
++
++/**
++ * Implements hook_block().
++ */
++function game_clock_block_OLD($op = 'list', $delta = 'default', $edit = array()) { }
++
++/**
++ * Implements hook_theme().
+  */
+ function game_clock_theme($existing, $type, $theme, $path) {
+   return array(
+     'game_clock_block' => array(
+-      'arguments' => array('clock' => 'default'),
++      'variables' => array('clock' => 'default'),
+       'file' => 'includes/game_clock.theme.inc',
+     ),
+     'game_clock_settings_form' => array(
+-      'arguments' => array('form' => NULL),
++      'render element' => 'form',
+       'file' => 'includes/game_clock.admin.inc',
+     ),
+   );
+diff -up -r includes/game_clock.admin.inc includes/game_clock.admin.inc
+--- includes/game_clock.admin.inc	2012-10-22 19:12:09.978545692 -0500
++++ includes/game_clock.admin.inc	2012-10-22 19:13:07.954543646 -0500
+@@ -13,6 +13,7 @@ function game_clock_list_page() {
+   global $game_clock_settings_page_standard_form;
+   if ($game_clock_settings_page_standard_form) {
+     $output .= drupal_get_form('game_clock_form');
++    // TODO Please change this theme call to use an associative array for the $variables parameter.
+     $output .= variable_get('game_clock_settings_form_count', 50) ? theme('pager') : '';
+   }
+   return $output;
+@@ -21,7 +22,7 @@ function game_clock_list_page() {
+ /**
+  *  Listing of game clocks on top of the admin/settings/game_clock page.
+  */
+-function game_clock_list_form($form_state) {
++function game_clock_list_form($form, $form_state) {
+   if (isset($form_state['values']['selector']) && $form_state['values']['selector'] == 'delete') {
+     foreach ($form_state['values']['clocks'] as $clock => $selected) {
+       if ($selected['selection']) {
+@@ -44,6 +45,7 @@ function game_clock_list_form($form_stat
+   $game_clock_settings_page_standard_form = TRUE;
+ 
+   $game_clocks = array();
++  // TODO Please change this theme call to use an associative array for the $variables parameter.
+   $header = array(
+     theme('table_select_header_cell'),
+     array(
+@@ -79,6 +81,7 @@ function game_clock_list_form($form_stat
+     $results = pager_query($sql, variable_get('game_clock_settings_form_count', 50));
+   }
+   else {
++    // TODO Please convert this statement to the D7 database API syntax.
+     $results = db_query($sql);
+   }
+   while ($clock = db_fetch_object($results)) {
+@@ -116,7 +119,7 @@ function game_clock_list_form($form_stat
+     );
+     $form['clocks'][$clock]['title'] = array(
+       '#type' => 'item',
+-      '#value' => l(t('@title', array('@title' => $state->title)), 'admin/settings/game_clock/' . $clock),
++      '#value' => l(t('@title', array('@title' => $state->title)), 'admin/config/game_clock/' . $clock),
+     );
+     $form['clocks'][$clock]['type'] = array(
+       '#type' => 'item',
+@@ -139,11 +142,11 @@ function game_clock_list_form($form_stat
+       '#value' => t('@init', array('@init' => ($state->init ? t('Yes') : t('No')))),
+     );
+     $ops = array(
+-      l(t('edit'), 'admin/settings/game_clock/' . $clock),
+-      l(t('pause'), 'admin/settings/game_clock/' . $clock . '/pause'),
+-      l(t('start'), 'admin/settings/game_clock/' . $clock . '/start'),
+-      l(t('reset'), 'admin/settings/game_clock/' . $clock . '/reset'),
+-      l(t('delete'), 'admin/settings/game_clock/' . $clock . '/delete'),
++      l(t('edit'), 'admin/config/game_clock/' . $clock),
++      l(t('pause'), 'admin/config/game_clock/' . $clock . '/pause'),
++      l(t('start'), 'admin/config/game_clock/' . $clock . '/start'),
++      l(t('reset'), 'admin/config/game_clock/' . $clock . '/reset'),
++      l(t('delete'), 'admin/config/game_clock/' . $clock . '/delete'),
+     );
+     $form['clocks'][$clock]['ops'] = array(
+       '#type' => 'item',
+@@ -162,6 +165,10 @@ function game_clock_list_form($form_stat
+   return $form;
+ }
+ 
++/**
++ * @todo Please document this function.
++ * @see http://drupal.org/node/1354
++ */
+ function game_clock_list_form_submit($form, &$form_state) {
+   $clocks = array();
+   foreach ($form_state['values']['clocks'] as $clock => $value) {
+@@ -207,7 +214,7 @@ function game_clock_delete_form(&$form_s
+     foreach ($clocks as $state) {
+       $items[] = t('%clock', array('%clock' => $state->title));
+     }
+-    $message .= theme('item_list', $items);
++    $message .= theme('item_list', array('items' => $items));
+     $message .= t('These game clocks may not be recovered.');
+   }
+   else {
+@@ -218,7 +225,7 @@ function game_clock_delete_form(&$form_s
+     '#value' => $clocks,
+   );
+   $form['#submit'][] = 'game_clock_delete_form_submit';
+-  return confirm_form($form, $title, 'admin/settings/game_clock', $message, t('Delete'));
++  return confirm_form($form, $title, 'admin/config/game_clock', $message, t('Delete'));
+ }
+ 
+ /**
+@@ -228,7 +235,7 @@ function game_clock_delete_form_submit($
+   foreach ($form_state['values']['clocks'] as $clock => $state) {
+     game_clock_delete($clock, TRUE);
+   }
+-  $form_state['redirect'] = 'admin/settings/game_clock';
++  $form_state['redirect'] = 'admin/config/game_clock';
+ }
+ 
+ /**
+@@ -247,7 +254,7 @@ function game_clock_reset_form(&$form_st
+     foreach ($clocks as $state) {
+       $items[] = t('%clock', array('%clock' => $state->title));
+     }
+-    $message .= theme('item_list', $items);
++    $message .= theme('item_list', array('items' => $items));
+     $message .= t('This action may not be undone.');
+   }
+   else {
+@@ -258,7 +265,7 @@ function game_clock_reset_form(&$form_st
+     '#value' => $clocks,
+   );
+   $form['#submit'][] = 'game_clock_reset_form_submit';
+-  return confirm_form($form, $title, 'admin/settings/game_clock', $message, t('Reset'));
++  return confirm_form($form, $title, 'admin/config/game_clock', $message, t('Reset'));
+ }
+ 
+ /**
+@@ -268,7 +275,7 @@ function game_clock_reset_form_submit($f
+   foreach ($form_state['values']['clocks'] as $clock => $state) {
+     game_clock_reset($clock);
+   }
+-  $form_state['redirect'] = 'admin/settings/game_clock';
++  $form_state['redirect'] = 'admin/config/game_clock';
+ }
+ 
+ /**
+@@ -279,7 +286,7 @@ function game_clock_edit_page($clock) {
+   if (!$clock->cid) {
+     drupal_not_found();
+   }
+-  drupal_set_title(t('Edit @clock', array('@clock' => $clock->title)));
++  drupal_set_title(t('Edit @clock', array('@clock' => $clock->title)), PASS_THROUGH);
+   return drupal_get_form('game_clock_form', $clock);
+ }
+ 
+@@ -290,7 +297,7 @@ function game_clock_edit_page($clock) {
+ function game_clock_pause_page($clock) {
+   game_clock_pause($clock->name);
+   drupal_set_message(t("Paused the %clock game clock.", array('%clock' => $clock->title)));
+-  drupal_goto('admin/settings/game_clock');
++  drupal_goto('admin/config/game_clock');
+ }
+ 
+ /**
+@@ -300,13 +307,13 @@ function game_clock_pause_page($clock) {
+ function game_clock_start_page($clock) {
+   game_clock_start($clock->name);
+   drupal_set_message(t("Started the %clock game clock.", array('%clock' => $clock->title)));
+-  drupal_goto('admin/settings/game_clock');
++  drupal_goto('admin/config/game_clock');
+ }
+ 
+ /**
+  *  Define the form to create a new game clock.
+  */
+-function game_clock_form($form_state, $clock = NULL) {
++function game_clock_form($form, $form_state, $clock = NULL) {
+   $clock = (object) $clock;
+   $form = array();
+   $form['clock'] = array(
+@@ -478,7 +485,7 @@ function game_clock_form_submit($form, &
+ 
+       // If we changed the name, then redirect to the new edit page.
+       if ($state && ($old_name != $state->name)) {
+-        drupal_goto('admin/settings/game_clock/' . $state->name);
++        drupal_goto('admin/config/game_clock/' . $state->name);
+       }
+     }
+   }
+@@ -548,7 +555,8 @@ function _game_clock_selections($increme
+ /**
+  *  Render the form as a table of clock settings and ops.
+  */
+-function theme_game_clock_settings_form($form) {
++function theme_game_clock_settings_form($variables) {
++  $form = $variables['form'];
+   $output .= drupal_render($form['selector']);
+   $header = $form['table_header']['#value'];
+   $rows = array();
+@@ -564,8 +572,8 @@ function theme_game_clock_settings_form(
+     $cells[] = drupal_render($form['clocks'][$clock]['ops']);
+     $rows[] = $cells;
+   }
+-  $output .= theme('table', $header, $rows);
+-  $output .= drupal_render($form);
++  $output .= theme('table', array('header' => $header, 'rows' => $rows));
++  $output .= drupal_render_children($form);
+ 
+   return $output;
+ }
+diff -up -r includes/game_clock.help.inc includes/game_clock.help.inc
+--- includes/game_clock.help.inc	2012-10-22 19:06:39.538557365 -0500
++++ includes/game_clock.help.inc	2012-10-22 19:13:07.966543643 -0500
+@@ -68,5 +68,5 @@ function _game_clock_help($section) {
+   hook_game_clock_delete(\$clock = 'default', \$state = NULL);
+ </pre>
+     <p>Please read the documentation in the game_clock.module file for more information.</p>
+-", array('!game_clock' => l(t('Game Clock administration'), 'admin/settings/game_clock')));
++", array('!game_clock' => l(t('Game Clock administration'), 'admin/config/game_clock')));
+ }
+diff -up -r includes/game_clock.inc includes/game_clock.inc
+--- includes/game_clock.inc	2012-10-22 19:12:09.978545692 -0500
++++ includes/game_clock.inc	2012-10-22 19:13:08.046543641 -0500
+@@ -31,7 +31,20 @@ function _game_clock_create($state, $rep
+     game_clock_report_error($error, $options, $report_errors, 'error');
+     return FALSE;
+   }
+-  $status = db_query("INSERT INTO {game_clocks} (name, type, title, status, turn, increment, block, init) VALUES ('%s', '%s', '%s', %d, %d, %d, %d, %d)", $state->name, $state->type, $state->title, $state->status, $state->turn, $state->increment, $state->block, $state->init);
++  // TODO Please review the conversion of this statement to the D7 database API syntax.
++  /* db_query("INSERT INTO {game_clocks} (name, type, title, status, turn, increment, block, init) VALUES ('%s', '%s', '%s', %d, %d, %d, %d, %d)", $state->name, $state->type, $state->title, $state->status, $state->turn, $state->increment, $state->block, $state->init) */
++  $status = $id = db_insert('game_clocks')
++  ->fields(array(
++    'name' => $state->name,
++    'type' => $state->type,
++    'title' => $state->title,
++    'status' => $state->status,
++    'turn' => $state->turn,
++    'increment' => $state->increment,
++    'block' => $state->block,
++    'init' => $state->init,
++  ))
++  ->execute();
+   if (!$status) {
+     $error = 'Creation of the %clock game clock failed for an unknown reason.';
+     $options = array('%clock' => $state->title);
+@@ -42,7 +55,7 @@ function _game_clock_create($state, $rep
+   module_invoke_all('game_clock_create', $state->name, $state);
+   $message = 'Created %title game clock.';
+   $options = array('%title' => $state->title);
+-  $link = l(t('@name', array('@name' => $state->title)), 'admin/settings/game_clock/' . $state->name);
++  $link = l(t('@name', array('@name' => $state->title)), 'admin/config/game_clock/' . $state->name);
+   game_clock_report_error($message, $options, $report_errors, 'status', $link);
+   return $state;
+ }
+@@ -68,7 +81,11 @@ function _game_clock_delete($clock, $rep
+     game_clock_report_error($error, $options, $report_errors, 'error');
+     return FALSE;
+   }
+-  db_query("DELETE FROM {game_clocks} WHERE cid = %d", $state->cid);
++  // TODO Please review the conversion of this statement to the D7 database API syntax.
++  /* db_query("DELETE FROM {game_clocks} WHERE cid = %d", $state->cid) */
++  db_delete('game_clocks')
++  ->condition('cid', $state->cid)
++  ->execute();
+   global $game_clocks;
+   unset($game_clocks[$state->name]);
+   module_invoke_all('game_clock_delete', $state->name, $state);
+@@ -98,13 +115,28 @@ function _game_clock_save($state, $repor
+   $state->next_tick = 0;
+   if ($state->cid) {
+     // Make sure we're trying to save a clock that hasn't been deleted.
+-    $test_state = db_fetch_object(db_query("SELECT * FROM {game_clocks} WHERE cid = %d", $state->cid));
++    $test_state = db_fetch_object(db_query("SELECT * FROM {game_clocks} WHERE cid = :cid", array(':cid' => $state->cid)));
+     if ($test_state->cid) {
+-      $status = db_query("UPDATE {game_clocks} SET name = '%s', type = '%s', title = '%s', status = %d, turn = %d, increment = %d, block = %d, init = %d, next_tick = 0 WHERE cid = %d", $state->name, $state->type, $state->title, $state->status, $state->turn, $state->increment, $state->block, $state->init, $state->cid);
++      // TODO Please review the conversion of this statement to the D7 database API syntax.
++      /* db_query("UPDATE {game_clocks} SET name = '%s', type = '%s', title = '%s', status = %d, turn = %d, increment = %d, block = %d, init = %d, next_tick = 0 WHERE cid = %d", $state->name, $state->type, $state->title, $state->status, $state->turn, $state->increment, $state->block, $state->init, $state->cid) */
++      $status = db_update('game_clocks')
++  ->fields(array(
++    'name' => $state->name,
++    'type' => $state->type,
++    'title' => $state->title,
++    'status' => $state->status,
++    'turn' => $state->turn,
++    'increment' => $state->increment,
++    'block' => $state->block,
++    'init' => $state->init,
++    'next_tick' =>  0,
++  ))
++  ->condition('cid', $state->cid)
++  ->execute();
+       if (!$status) {
+         $error = 'Saving the %clock game clock failed for an unknown reason.';
+         $options = array('%clock' => $state->title);
+-        $link = l(t('edit'), 'admin/settings/game_clock/' . $state->name);
++        $link = l(t('edit'), 'admin/config/game_clock/' . $state->name);
+         game_clock_report_error($error, $options, $report_errors, 'error', $link);
+         return FALSE;
+       }
+diff -up -r includes/game_clock.menu.inc includes/game_clock.menu.inc
+--- includes/game_clock.menu.inc	2012-10-22 19:06:39.538557365 -0500
++++ includes/game_clock.menu.inc	2012-10-22 19:13:08.086543640 -0500
+@@ -10,14 +10,14 @@
+  */
+ function _game_clock_menu() {
+   $items = array(
+-    'admin/settings/game_clock' => array(
++    'admin/config/game_clock' => array(
+       'title' => 'Game clocks',
+       'description' => 'Administer the game clocks.',
+       'page callback' => 'game_clock_list_page',
+       'access arguments' => array('administer game clock'),
+       'file' => 'includes/game_clock.admin.inc',
+     ),
+-    'admin/settings/game_clock/list' => array(
++    'admin/config/game_clock/list' => array(
+       'title' => 'List',
+       'description' => 'List the game clocks.',
+       'page callback' => 'game_clock_list_page',
+@@ -25,7 +25,7 @@ function _game_clock_menu() {
+       'file' => 'includes/game_clock.admin.inc',
+       'type' => MENU_DEFAULT_LOCAL_TASK,
+     ),
+-    'admin/settings/game_clock/add' => array(
++    'admin/config/game_clock/add' => array(
+       'title' => 'Add',
+       'description' => 'Add a new game clock.',
+       'page callback' => 'drupal_get_form',
+@@ -35,7 +35,7 @@ function _game_clock_menu() {
+       'type' => MENU_LOCAL_TASK,
+       'weight' => 1,
+     ),
+-    'admin/settings/game_clock/settings' => array(
++    'admin/config/game_clock/settings' => array(
+       'title' => 'Settings',
+       'description' => 'Configure the game clocks global settings.',
+       'page callback' => 'drupal_get_form',
+@@ -45,7 +45,7 @@ function _game_clock_menu() {
+       'type' => MENU_LOCAL_TASK,
+       'weight' => 3,
+     ),
+-    'admin/settings/game_clock/%game_clock' => array(
++    'admin/config/game_clock/%game_clock' => array(
+       'title' => 'Edit',
+       'page callback' => 'game_clock_edit_page',
+       'page arguments' => array(3),
+@@ -54,7 +54,7 @@ function _game_clock_menu() {
+       'file' => 'includes/game_clock.admin.inc',
+       'type' => MENU_CALLBACK,
+     ),
+-    'admin/settings/game_clock/%game_clock/edit' => array(
++    'admin/config/game_clock/%game_clock/edit' => array(
+       'title' => 'Edit',
+       'page callback' => 'game_clock_edit_page',
+       'page arguments' => array(3),
+@@ -64,7 +64,7 @@ function _game_clock_menu() {
+       'type' => MENU_DEFAULT_LOCAL_TASK,
+       'weight' => -9,
+     ),
+-    'admin/settings/game_clock/%game_clock/pause' => array(
++    'admin/config/game_clock/%game_clock/pause' => array(
+       'title' => 'Pause',
+       'page callback' => 'game_clock_pause_page',
+       'page arguments' => array(3),
+@@ -74,7 +74,7 @@ function _game_clock_menu() {
+       'type' => MENU_LOCAL_TASK,
+       'weight' => -7,
+     ),
+-    'admin/settings/game_clock/%game_clock/start' => array(
++    'admin/config/game_clock/%game_clock/start' => array(
+       'title' => 'Run',
+       'page callback' => 'game_clock_start_page',
+       'page arguments' => array(3),
+@@ -84,7 +84,7 @@ function _game_clock_menu() {
+       'type' => MENU_LOCAL_TASK,
+       'weight' => -5,
+     ),
+-    'admin/settings/game_clock/%game_clock/reset' => array(
++    'admin/config/game_clock/%game_clock/reset' => array(
+       'title' => 'Reset',
+       'page callback' => 'drupal_get_form',
+       'page arguments' => array('game_clock_reset_form', 3),
+@@ -94,7 +94,7 @@ function _game_clock_menu() {
+       'type' => MENU_LOCAL_TASK,
+       'weight' => -3,
+     ),
+-    'admin/settings/game_clock/%game_clock/delete' => array(
++    'admin/config/game_clock/%game_clock/delete' => array(
+       'title' => 'Delete',
+       'page callback' => 'drupal_get_form',
+       'page arguments' => array('game_clock_delete_form', 3),
+diff -up -r includes/game_clock.theme.inc includes/game_clock.theme.inc
+--- includes/game_clock.theme.inc	2012-10-22 19:12:09.982545692 -0500
++++ includes/game_clock.theme.inc	2012-10-22 19:13:08.094543641 -0500
+@@ -10,7 +10,8 @@
+  *  @param $clock
+  *    The machine name of the game clock to display.
+  */
+-function theme_game_clock_block($clock = 'default') {
++function theme_game_clock_block($variables) {
++  $clock = $variables['clock'];
+   $state = game_clock_state($clock);
+   $output = t('Turn: @turn', array('@turn' => $state->turn));
+   if (!$state->status) {
+diff -up -r modules/game_clock_field/game_clock_field.info modules/game_clock_field/game_clock_field.info
+--- modules/game_clock_field/game_clock_field.info	2012-10-22 19:06:39.538557365 -0500
++++ modules/game_clock_field/game_clock_field.info	2012-10-22 19:13:08.094543641 -0500
+@@ -5,12 +5,12 @@ dependencies[] = text
+ dependencies[] = optionwidgets
+ dependencies[] = game_clock
+ package = Game
+-core = 6.x
++core = 7.x
+ 
+ 
+ ; Information added by drupal.org packaging script on 2011-02-25
+ version = "6.x-1.x-dev"
+-core = "6.x"
++core = 7.x
+ project = "game_clock"
+ datestamp = "1298619320"
+ 
+diff -up -r modules/game_clock_field/game_clock_field.install modules/game_clock_field/game_clock_field.install
+--- modules/game_clock_field/game_clock_field.install	2012-10-22 19:06:39.538557365 -0500
++++ modules/game_clock_field/game_clock_field.install	2012-10-22 19:13:08.106543638 -0500
+@@ -1,8 +1,14 @@
+ <?php
++/**
++ * @file
++ * Install, update and uninstall functions for the game_clock_field module.
++ *
++ */
++
+ 
+ /**
+  * @file
+- * Implementation of hook_install().
++ * Implements hook_install().
+  */
+ function game_clock_field_install() {
+   drupal_load('module', 'content');
+@@ -10,7 +16,7 @@ function game_clock_field_install() {
+ }
+ 
+ /**
+- * Implementation of hook_uninstall().
++ * Implements hook_uninstall().
+  */
+ function game_clock_field_uninstall() {
+   drupal_load('module', 'content');
+@@ -18,7 +24,7 @@ function game_clock_field_uninstall() {
+ }
+ 
+ /**
+- * Implementation of hook_enable().
++ * Implements hook_enable().
+  *
+  * Notify content module when this module is enabled.
+  */
+@@ -28,7 +34,7 @@ function game_clock_field_enable() {
+ }
+ 
+ /**
+- * Implementation of hook_disable().
++ * Implements hook_disable().
+  *
+  * Notify content module when this module is disabled.
+  */
+diff -up -r modules/game_clock_field/game_clock_field.module modules/game_clock_field/game_clock_field.module
+--- modules/game_clock_field/game_clock_field.module	2012-10-22 19:12:09.982545692 -0500
++++ modules/game_clock_field/game_clock_field.module	2012-10-22 19:13:08.590543621 -0500
+@@ -6,7 +6,7 @@
+  */
+ 
+ /**
+- * Implementation of hook_menu().
++ * Implements hook_menu().
+  */
+ function game_clock_field_menu() {
+   $items = array();
+@@ -20,62 +20,62 @@ function game_clock_field_menu() {
+ }
+ 
+ /**
+- * Implementation of hook_theme().
++ * Implements hook_theme().
+  */
+ function game_clock_field_theme() {
+   return array(
+     'game_clock_field_select' => array(
+-      'arguments' => array('element' => NULL),
++      'render element' => 'element',
+     ),
+     'game_clock_field_buttons' => array(
+-      'arguments' => array('element' => NULL),
++      'render element' => 'element',
+     ),
+     'game_clock_field_autocomplete' => array(
+-      'arguments' => array('element' => NULL),
++      'render element' => 'element',
+     ),
+     'game_clock_field_formatter_default' => array(
+-      'arguments' => array('element'),
++      'variables' => array('element'),
+     ),
+     'game_clock_field_formatter_admin' => array(
+-      'arguments' => array('element'),
++      'variables' => array('element'),
+     ),
+     'game_clock_field_formatter_title' => array(
+-      'arguments' => array('element'),
++      'variables' => array('element'),
+       'function' => 'theme_game_clock_field_formatter_column',
+     ),
+     'game_clock_field_formatter_turn' => array(
+-      'arguments' => array('element'),
++      'variables' => array('element'),
+       'function' => 'theme_game_clock_field_formatter_column',
+     ),
+     'game_clock_field_formatter_type' => array(
+-      'arguments' => array('element'),
++      'variables' => array('element'),
+       'function' => 'theme_game_clock_field_formatter_column',
+     ),
+     'game_clock_field_formatter_status' => array(
+-      'arguments' => array('element'),
++      'variables' => array('element'),
+       'function' => 'theme_game_clock_field_formatter_column',
+     ),
+     'game_clock_field_formatter_increment' => array(
+-      'arguments' => array('element'),
++      'variables' => array('element'),
+       'function' => 'theme_game_clock_field_formatter_column',
+     ),
+     'game_clock_field_formatter_next_tick' => array(
+-      'arguments' => array('element'),
++      'variables' => array('element'),
+       'function' => 'theme_game_clock_field_formatter_column',
+     ),
+     'game_clock_field_formatter_init' => array(
+-      'arguments' => array('element'),
++      'variables' => array('element'),
+       'function' => 'theme_game_clock_field_formatter_column',
+     ),
+     'game_clock_field_formatter_cid' => array(
+-      'arguments' => array('element'),
++      'variables' => array('element'),
+       'function' => 'theme_game_clock_field_formatter_column',
+     ),
+   );
+ }
+ 
+ /**
+- * Implementation of hook_field_info().
++ * Implements hook_field_info().
+  */
+ function game_clock_field_field_info() {
+   return array(
+@@ -87,7 +87,7 @@ function game_clock_field_field_info() {
+ }
+ 
+ /**
+- * Implementation of hook_field_settings().
++ * Implements hook_field_settings().
+  */
+ function game_clock_field_field_settings($op, $field) {
+   switch ($op) {
+@@ -182,7 +182,7 @@ function game_clock_field_field_settings
+ }
+ 
+ /**
+- * Implementation of hook_field().
++ * Implements hook_field().
+  */
+ function game_clock_field_field($op, &$node, $field, &$items, $teaser, $page) {
+   switch ($op) {
+@@ -211,7 +211,7 @@ function game_clock_field_field($op, &$n
+ }
+ 
+ /**
+- * Implementation of hook_content_is_empty().
++ * Implements hook_content_is_empty().
+  */
+ function game_clock_field_content_is_empty($item, $field) {
+   if (empty($item['cid'])) {
+@@ -221,7 +221,7 @@ function game_clock_field_content_is_emp
+ }
+ 
+ /**
+- * Implementation of hook_field_formatter_info().
++ * Implements hook_field_formatter_info().
+  */
+ function game_clock_field_field_formatter_info() {
+   return array(
+@@ -271,7 +271,8 @@ function game_clock_field_field_formatte
+ /**
+  * Theme function for 'default' game_clock_field field formatter.
+  */
+-function theme_game_clock_field_formatter_default($element) {
++function theme_game_clock_field_formatter_default($variables) {
++  $element = $variables['0'];
+   $output = '';
+   if (!empty($element['#item']['cid']) && is_numeric($element['#item']['cid']) && ($title = _game_clock_field_titles($element['#item']['cid']))) {
+     $state = game_clock_state($element['#item']['cid'], TRUE);
+@@ -283,11 +284,12 @@ function theme_game_clock_field_formatte
+ /**
+  * Theme function for 'admin' game_clock_field field formatter.
+  */
+-function theme_game_clock_field_formatter_admin($element) {
++function theme_game_clock_field_formatter_admin($variables) {
++  $element = $variables['0'];
+   $output = '';
+   if (!empty($element['#item']['cid']) && is_numeric($element['#item']['cid']) && ($title = _game_clock_field_titles($element['#item']['cid']))) {
+     $state = game_clock_state($element['#item']['cid'], TRUE);
+-    $output = l(t('%title', array('%title' => $state->title)), 'admin/settings/game_clock/' . $state->name);
++    $output = l(t('%title', array('%title' => $state->title)), 'admin/config/game_clock/' . $state->name);
+   }
+   return $output;
+ }
+@@ -296,6 +298,7 @@ function theme_game_clock_field_formatte
+  * Proxy theme function for columns of game_clock_field field formatters.
+  */
+ function theme_game_clock_field_formatter_column($element) {
++  // TODO: Should this theme game_clock_field_formatter_column be declared in hook_theme()?
+   $output = '';
+   if (!empty($element['#item']['cid']) && is_numeric($element['#item']['cid'])) {
+     $state = game_clock_state($element['#item']['cid'], TRUE);
+@@ -326,14 +329,14 @@ function theme_game_clock_field_formatte
+ function _game_clock_field_titles($cid, $known_title = NULL) {
+   static $titles = array();
+   if (!isset($titles[$cid])) {
+-    $title = $known_title ? $known_title : db_result(db_query("SELECT title FROM {game_clocks} WHERE cid=%d", $cid));
++    $title = $known_title ? $known_title : db_query("SELECT title FROM {game_clocks} WHERE cid = :cid", array(':cid' => $cid))->fetchField();
+     $titles[$cid] = $title ? $title : '';
+   }
+   return $titles[$cid];
+ }
+ 
+ /**
+- * Implementation of hook_widget_info().
++ * Implements hook_widget_info().
+  *
+  * We need custom handling of multiple values for the game_clock_field_select
+  * widget because we need to combine them into a options list rather
+@@ -376,18 +379,18 @@ function game_clock_field_widget_info()
+ }
+ 
+ /**
+- * Implementation of FAPI hook_elements().
++ * Implements hook_element_info().
+  *
+  * Any FAPI callbacks needed for individual widgets can be declared here,
+  * and the element will be passed to those callbacks for processing.
+  *
+  * Drupal will automatically theme the element using a theme with
+- * the same name as the hook_elements key.
++ * the same name as the hook_element_info key.
+  *
+  * Autocomplete_path is not used by text_widget but other widgets can use it
+  * (see game_clock_field and userreference).
+  */
+-function game_clock_field_elements() {
++function game_clock_field_element_info() {
+   return array(
+     'game_clock_field_select' => array(
+       '#input' => TRUE,
+@@ -412,7 +415,7 @@ function game_clock_field_elements() {
+ }
+ 
+ /**
+- * Implementation of hook_widget_settings().
++ * Implements hook_widget_settings().
+  */
+ function game_clock_field_widget_settings($op, $widget) {
+   switch ($op) {
+@@ -445,7 +448,7 @@ function game_clock_field_widget_setting
+ }
+ 
+ /**
+- * Implementation of hook_widget().
++ * Implements hook_widget().
+  *
+  * Attach a single form element to the form. It will be built out and
+  * validated in the callback(s) listed in hook_elements. We build it
+@@ -511,7 +514,7 @@ function game_clock_field_autocomplete_v
+   $field_key  = $element['#columns'][0];
+   if (!empty($element['#default_value'][$field_key])) {
+     $nid = $element['#default_value'][$field_key];
+-    $value = db_result(db_query('SELECT c.title FROM {game_clocks} c WHERE c.cid = %d', $cid));
++    $value = db_query('SELECT c.title FROM {game_clocks} c WHERE c.cid = :c.cid', array(':c.cid' => $cid))->fetchField();
+     $value .= ' [cid:' . $cid . ']';
+     return array($field_key => $value);
+   }
+@@ -701,7 +704,7 @@ function game_clock_field_autocomplete_v
+ }
+ 
+ /**
+- * Implementation of hook_allowed_values().
++ * Implements hook_allowed_values().
+  */
+ function game_clock_field_allowed_values($field) {
+   $references = _game_clock_field_potential_references($field);
+@@ -887,7 +890,9 @@ function _game_clock_field_potential_ref
+ 
+   $where_clause = $where ? 'WHERE (' . implode(') AND (', $where) . ')' : '';
+   $sql = "SELECT c.cid, c.title AS game_clock_title, c.type AS game_clock_type FROM {game_clocks} c $where_clause ORDER BY c.title, c.type";
+-  $result = $limit ? db_query_range($sql, $args, 0, $limit) : db_query($sql, $args);
++  // TODO Please convert this statement to the D7 database API syntax.
++  // TODO Please convert this statement to the D7 database API syntax.
++  $result = $limit ? db_query_range($sql, $args) : db_query($sql, $args);
+   $references = array();
+   while ($game_clock = db_fetch_object($result)) {
+     $references[$game_clock->cid] = array(
+@@ -913,7 +918,7 @@ function game_clock_field_autocomplete($
+     // Add a class wrapper for a few required CSS overrides.
+     $matches[$row['title'] . " [cid:$id]"] = '<div class="reference-autocomplete">' . $row['rendered'] . '</div>';
+   }
+-  drupal_json($matches);
++  drupal_json_output($matches);
+ }
+ 
+ /**
+@@ -969,14 +974,25 @@ function game_clock_field_preprocess_nod
+  * $element['#field_name'] contains the field name
+  * $element['#delta]  is the position of this element in the group
+  */
+-function theme_game_clock_field_select($element) {
++function theme_game_clock_field_select($variables) {
++  $element = $variables['element'];
+   return $element['#children'];
+ }
+ 
+-function theme_game_clock_field_buttons($element) {
++/**
++ * @todo Please document this function.
++ * @see http://drupal.org/node/1354
++ */
++function theme_game_clock_field_buttons($variables) {
++  $element = $variables['element'];
+   return $element['#children'];
+ }
+ 
+-function theme_game_clock_field_autocomplete($element) {
++/**
++ * @todo Please document this function.
++ * @see http://drupal.org/node/1354
++ */
++function theme_game_clock_field_autocomplete($variables) {
++  $element = $variables['element'];
+   return $element['#children'];
+ }
+diff -up -r modules/game_clock_field/game_clock_field.rules.inc modules/game_clock_field/game_clock_field.rules.inc
+--- modules/game_clock_field/game_clock_field.rules.inc	2012-10-22 19:06:39.538557365 -0500
++++ modules/game_clock_field/game_clock_field.rules.inc	2012-10-22 19:13:08.610543623 -0500
+@@ -6,7 +6,7 @@
+  */
+ 
+ /**
+- * Implementation of hook_rules_action_info().
++ * Implements hook_rules_action_info().
+  */
+ function game_clock_field_rules_action_info() {
+   $info = array();
+@@ -30,12 +30,20 @@ function game_clock_field_rules_action_i
+   return $info;
+ }
+ 
++/**
++ * @todo Please document this function.
++ * @see http://drupal.org/node/1354
++ */
+ function game_clock_field_rules_action_load($node, $settings) {
+   if ($cid = $node->{$settings['field']}[0]['cid']) {
+     return array('referenced_game_clock' => game_clock_state($cid, TRUE));
+   }
+ }
+ 
++/**
++ * @todo Please document this function.
++ * @see http://drupal.org/node/1354
++ */
+ function game_clock_field_rules_action_load_form($settings, &$form) {
+   $settings += array('field' => '');
+   $options = content_rules_get_field_names_by_type('game_clock_field');

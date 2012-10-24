@@ -6,17 +6,28 @@
  */
 
 /**
- * Implementation of hook_install().
+ * Implements hook_install().
  */
 function game_clock_install() {
-  $success = drupal_install_schema('game_clock');
+  // TODO The drupal_(un)install_schema functions are called automatically in D7.
+  $success = array()/*drupal_install_schema('game_clock')*/;
 
   if ($success) {
     // Insert a starting record.
     // Note that UI strings in the following SQL, e.g. "Default", aren't
     // wrapped in t() and that's intentional: they are passed to t() later,
     // thus allowing for multilingual sites.
-    db_query("INSERT INTO {game_clocks} (name, title, increment, block, init) VALUES ('default', 'Default', 15, 1, 1)");
+    // TODO Please review the conversion of this statement to the D7 database API syntax.
+    /* db_query("INSERT INTO {game_clocks} (name, title, increment, block, init) VALUES ('default', 'Default', 15, 1, 1)") */
+    $id = db_insert('game_clocks')
+  ->fields(array(
+      'name' => 'default',
+      'title' => 'Default',
+      'increment' => 15,
+      'block' => 1,
+      'init' => 1,
+    ))
+  ->execute();
   }
 
   if ($success) {
@@ -28,10 +39,12 @@ function game_clock_install() {
 }
 
 /**
- * Implementation of hook_uninstall().
+ * Implements hook_uninstall().
  */
 function game_clock_uninstall() {
-  drupal_uninstall_schema('game_clock');
+  // TODO The drupal_(un)install_schema functions are called automatically in D7.
+  // drupal_uninstall_schema('game_clock')
+  // TODO Please convert this statement to the D7 database API syntax.
   $result = db_query("SELECT name FROM {variable} WHERE name LIKE 'game_clock_%'");
   while ($row = db_fetch_object($result)) {
     variable_del($row->name);
@@ -41,7 +54,7 @@ function game_clock_uninstall() {
 }
 
 /**
- * Implementation of hook_schema().
+ * Implements hook_schema().
  */
 function game_clock_schema() {
   $schema = array();
@@ -114,7 +127,7 @@ function game_clock_schema() {
     ),
     'primary key' => array('cid'),
     'unique keys' => array(
-      'name' => array('name')
+      'name' => array('name'),
     ),
   );
 
@@ -125,12 +138,15 @@ function game_clock_schema() {
  *  Add the 'type' field to game clocks.
  */
 function game_clock_update_6001() {
-  db_add_field($ret, 'game_clocks', 'type', array(
-      'type' => 'varchar',
-      'length' => '32',
-      'not null' => FALSE,
-      'default' => '',
-    ));
+  db_add_field('game_clocks', 'type', array(
+    'type' => 'varchar',
+    'length' => '32',
+    'not null' => FALSE,
+    'default' => '',
+  ));
   menu_rebuild();
-  return $ret;
+  // hook_update_N() no longer returns a $ret array. Instead, return
+  // nothing or a translated string indicating the update ran successfully.
+  // See http://drupal.org/node/224333#update_sql.
+  return t('TODO Add a descriptive string here to show in the UI.') /* $ret */;
 }

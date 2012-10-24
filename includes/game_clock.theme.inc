@@ -10,11 +10,12 @@
  *  @param $clock
  *    The machine name of the game clock to display.
  */
-function theme_game_clock_block($clock = 'default') {
+function theme_game_clock_block($variables) {
+  $clock = $variables['clock'];
   $state = game_clock_state($clock);
   $output = t('Turn: @turn', array('@turn' => $state->turn));
   if (!$state->status) {
-    $output .= ' <span>'. t('(paused)') .'</span>';
+    $output .= ' <span>' . t('(paused)') . '</span>';
   }
   return $output;
 }

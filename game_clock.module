@@ -10,11 +10,11 @@
  */
 
 /**
- *  Implements hook_help().
+ * Implements hook_help().
  */
 function game_clock_help($section) {
   switch ($section) {
-    case 'admin/settings/game_clock':
+    case 'admin/config/game_clock':
       return t("
         <p>Game clocks may be used for various purposes, such as keeping an in-game calendar, tracking game effects and events, and limiting characters to acting at a slower pace suitable for a web-based game.</p>
         <p>You may view all active game clocks from this page, as well as create new clocks below. Additionally, you can create new game clocks programmatically with the API provided with the Game Clock module. See the !help page for more information.</p>
@@ -41,8 +41,15 @@ function game_clock_pause($clock = 'default', $status = FALSE) {
   if ($state->status != $status) {
     global $game_clocks;
     $game_clocks[$clock]->status = $status;
-    db_query('UPDATE {game_clocks} SET status = %d WHERE cid = %d', $status, $state->cid);
-    module_invoke_all('game_clock_'. ($status ? 'start' : 'pause'), $clock, $game_clocks[$clock]);
+    // TODO Please review the conversion of this statement to the D7 database API syntax.
+    /* db_query('UPDATE {game_clocks} SET status = %d WHERE cid = %d', $status, $state->cid) */
+    db_update('game_clocks')
+  ->fields(array(
+      'status' => $status,
+    ))
+  ->condition('cid', $state->cid)
+  ->execute();
+    module_invoke_all('game_clock_' . ($status ? 'start' : 'pause'), $clock, $game_clocks[$clock]);
     game_clock_increment($clock);
   }
 }
@@ -81,14 +88,14 @@ function game_clock_increment($clock = 'default', $force = FALSE) {
   }
 
   // If it's time for the next tick, or if we're manually incrementing the clock, then increment.
-  if (($state->increment && (time() >= ($state->next_tick))) || $force) {
+  if (($state->increment && (REQUEST_TIME >= ($state->next_tick))) || $force) {
     global $game_clocks;
 
     // If the clock has run in the past, then figure out how many turns we've missed.
     // This ensures the clock represents the correct tick.
 
     // First, get the number of seconds passed since it should have ticked.
-    $passed = time() - $game_clocks[$clock]->next_tick;
+    $passed = REQUEST_TIME - $game_clocks[$clock]->next_tick;
 
     // The number of ticks will equal the number of seconds passed divided by the increment, rounding down and adding one.
     $game_clocks[$clock]->ticks = ($game_clocks[$clock]->next_tick ? floor($passed / $game_clocks[$clock]->increment) : 0) + 1;
@@ -99,12 +106,20 @@ function game_clock_increment($clock = 'default', $force = FALSE) {
     if ($game_clocks[$clock]->increment) {
       // Record the next turn that we should increment the clock.
       // Subtract the amount left over from our earlier $passed division for better accuracy.
-      $game_clocks[$clock]->next_tick = time() + $game_clocks[$clock]->increment - fmod($passed, $game_clocks[$clock]->increment);
+      $game_clocks[$clock]->next_tick = REQUEST_TIME + $game_clocks[$clock]->increment - fmod($passed, $game_clocks[$clock]->increment);
     }
 
     // Store the clock state to the database. Note that we don't store the ->ticks,
     // but they'll be passed to the modules in the next step.
-    db_query("UPDATE {game_clocks} SET turn = %d, next_tick = %d WHERE cid = %d", $game_clocks[$clock]->turn, $game_clocks[$clock]->next_tick, $game_clocks[$clock]->cid);
+    // TODO Please review the conversion of this statement to the D7 database API syntax.
+    /* db_query("UPDATE {game_clocks} SET turn = %d, next_tick = %d WHERE cid = %d", $game_clocks[$clock]->turn, $game_clocks[$clock]->next_tick, $game_clocks[$clock]->cid) */
+    db_update('game_clocks')
+  ->fields(array(
+      'turn' => $game_clocks[$clock]->turn,
+      'next_tick' => $game_clocks[$clock]->next_tick,
+    ))
+  ->condition('cid', $game_clocks[$clock]->cid)
+  ->execute();
 
     // Invoke hook_game_clock_increment. Note that we pass ->ticks, so the modules know how many
     // ticks have actually passed, rather than necessarily incrementing for every tick.
@@ -132,7 +147,15 @@ function game_clock_reset($clock = 'default', $turn = NULL) {
   $state = game_clock_state($clock);
   $game_clocks[$clock]->turn = isset($turn) ? $turn : 0;
   $game_clocks[$clock]->next_tick = 0;
-  db_query("UPDATE {game_clocks} SET turn = %d, next_tick = %d WHERE cid = %d", $game_clocks[$clock]->turn, $game_clocks[$clock]->next_tick, $game_clocks[$clock]->cid);
+  // TODO Please review the conversion of this statement to the D7 database API syntax.
+  /* db_query("UPDATE {game_clocks} SET turn = %d, next_tick = %d WHERE cid = %d", $game_clocks[$clock]->turn, $game_clocks[$clock]->next_tick, $game_clocks[$clock]->cid) */
+  db_update('game_clocks')
+  ->fields(array(
+    'turn' => $game_clocks[$clock]->turn,
+    'next_tick' => $game_clocks[$clock]->next_tick,
+  ))
+  ->condition('cid', $game_clocks[$clock]->cid)
+  ->execute();
   module_invoke_all('game_clock_reset', $clock, $game_clocks[$clock]);
   game_clock_increment($clock);
 }
@@ -237,7 +260,7 @@ function game_clock_state($clock = NULL, $is_cid = NULL) {
         return $state;
       }
     }
-    $result = db_fetch_object(db_query("SELECT * FROM {game_clocks} WHERE cid = %d", $clock));
+    $result = db_fetch_object(db_query("SELECT * FROM {game_clocks} WHERE cid = :cid", array(':cid' => $clock)));
     if ($result->cid) {
       $game_clocks[$result->name] = $result;
       return $result;
@@ -246,7 +269,7 @@ function game_clock_state($clock = NULL, $is_cid = NULL) {
   }
 
   if (!isset($game_clocks[$clock])) {
-    $results = db_query('SELECT * FROM {game_clocks} WHERE name = "%s"', $clock);
+    $results = db_query('SELECT * FROM {game_clocks} WHERE name = :name', array(':name' => $clock));
     while ($result = db_fetch_object($results)) {
       $game_clocks[$result->name] = $result;
     }
@@ -266,7 +289,7 @@ function game_clock_type_states($type = '') {
   global $game_clocks;
 
   $clocks = array();
-  $results = db_query("SELECT * FROM {game_clocks} WHERE type = '%s'", $type);
+  $results = db_query("SELECT * FROM {game_clocks} WHERE type = :type", array(':type' => $type));
   while ($state = db_fetch_object($results)) {
     $game_clocks[$state->name] = $clocks[$state->name] = $state;
   }
@@ -287,16 +310,18 @@ function game_clock_current_turn($clock = 'default') {
 }
 
 /**
- *  Implements hook_init().
+ * Implements hook_init().
  */
 function game_clock_init() {
   global $game_clocks;
   $sql = "SELECT * FROM {game_clocks} WHERE status <> 0 AND increment > 0 AND init <> 0 AND next_tick < %d ORDER BY next_tick";
   if ($limit = variable_get('game_clock_limit_on_init', 0)) {
-    $results = db_query_range($sql, 0, $limit);
+    // TODO Please convert this statement to the D7 database API syntax.
+    $results = db_query_range($sql);
   }
   else {
-    $results = db_query($sql, time());
+    // TODO Please convert this statement to the D7 database API syntax.
+    $results = db_query($sql, REQUEST_TIME);
   }
   while ($result = db_fetch_object($results)) {
     $game_clocks[$result->name] = $result;
@@ -305,16 +330,18 @@ function game_clock_init() {
 }
 
 /**
- *  Implements hook_cron().
+ * Implements hook_cron().
  */
 function game_clock_cron() {
   global $game_clocks;
   $sql = "SELECT * FROM {game_clocks} WHERE status <> 0 AND increment > 0 AND next_tick < %d ORDER BY next_tick";
   if ($limit = variable_get('game_clock_limit_on_cron', 0)) {
-    $results = db_query_range($sql, 0, $limit);
+    // TODO Please convert this statement to the D7 database API syntax.
+    $results = db_query_range($sql);
   }
   else {
-    $results = db_query($sql, time());
+    // TODO Please convert this statement to the D7 database API syntax.
+    $results = db_query($sql, REQUEST_TIME);
   }
   while ($result = db_fetch_object($results)) {
     $game_clocks[$result->name] = $result;
@@ -323,7 +350,7 @@ function game_clock_cron() {
 }
 
 /**
- *  Implements hook_menu().
+ * Implements hook_menu().
  */
 function game_clock_menu() {
   module_load_include('inc', 'game_clock', 'includes/game_clock.menu');
@@ -331,59 +358,76 @@ function game_clock_menu() {
 }
 
 /**
- *  Implement hook_load() (for menu, not for node).
+ * Implements hook_load() (for menu, not for node)().
  *  Helper function for menu: this loads the %game_clock argument.
  */
-function game_clock_load($clock, $is_cid = NULL) {
-  return game_clock_state($clock, $is_cid);
-}
-
-/**
- *  Implements hook_perm().
- */
-function game_clock_perm() {
-  return array('administer game clock');
-}
-
-/**
- *  Implements hook_block().
- */
-function game_clock_block($op = 'list', $delta = 'default', $edit = array()) {
-  switch ($op) {
-    case 'list':
-      $blocks = array();
-      foreach (game_clock_state() as $game => $state) {
-        // Only make a block available if it's been checked on the game clock administration page.
-        if ($state->block) {
-          $blocks[$game] = array(
-            'info' => t('Game clock: @title', array('@title' => $state->title)),
-          );
-        }
-      }
-      return $blocks;
-    case 'view':
-      $state = game_clock_state($delta);
-      if ($state->cid) {
-        $block = array(
-          'subject' => t('@title', array('@title' => $state->title)),
-          'content' => theme('game_clock_block', $delta),
-        );
-      }
-      return $block;
+function game_clock_load($clocks, $is_cid = NULL) {
+  foreach ($clocks as $nid => &$clock) {
+    $node_additions = game_clock_state($clock, $is_cid);
+    foreach ($node_additions as $property => &$value) {
+      $clock->$property = $value;
+    }
   }
 }
 
 /**
- *  Implements hook_theme().
+ * Implements hook_permission().
+ */
+function game_clock_permission() {
+  return array(
+    'administer game clock' => array(
+      'title' => t('administer game clock'),
+      'description' => t('TODO Add a description for \'administer game clock\''),
+    ),
+  );
+}
+
+/**
+ * Implements hook_block_info().
+ */
+function game_clock_block_info() {
+  $blocks = array();
+  foreach (game_clock_state() as $game => $state) {
+    // Only make a block available if it's been checked on the game clock administration page.
+    if ($state->block) {
+      $blocks[$game] = array(
+        'info' => t('Game clock: @title', array('@title' => $state->title)),
+      );
+    }
+  }
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function game_clock_block_view($delta) {
+  $state = game_clock_state($delta);
+  if ($state->cid) {
+    $block = array(
+      'subject' => t('@title', array('@title' => $state->title)),
+      'content' => theme('game_clock_block', array('clock' => $delta)),
+    );
+  }
+  return $block;
+}
+
+/**
+ * Implements hook_block().
+ */
+function game_clock_block_OLD($op = 'list', $delta = 'default', $edit = array()) { }
+
+/**
+ * Implements hook_theme().
  */
 function game_clock_theme($existing, $type, $theme, $path) {
   return array(
     'game_clock_block' => array(
-      'arguments' => array('clock' => 'default'),
+      'variables' => array('clock' => 'default'),
       'file' => 'includes/game_clock.theme.inc',
     ),
     'game_clock_settings_form' => array(
-      'arguments' => array('form' => NULL),
+      'render element' => 'form',
       'file' => 'includes/game_clock.admin.inc',
     ),
   );

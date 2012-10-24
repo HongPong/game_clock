@@ -1,8 +1,14 @@
 <?php
+/**
+ * @file
+ * Install, update and uninstall functions for the game_clock_field module.
+ *
+ */
+
 
 /**
  * @file
- * Implementation of hook_install().
+ * Implements hook_install().
  */
 function game_clock_field_install() {
   drupal_load('module', 'content');
@@ -10,7 +16,7 @@ function game_clock_field_install() {
 }
 
 /**
- * Implementation of hook_uninstall().
+ * Implements hook_uninstall().
  */
 function game_clock_field_uninstall() {
   drupal_load('module', 'content');
@@ -18,7 +24,7 @@ function game_clock_field_uninstall() {
 }
 
 /**
- * Implementation of hook_enable().
+ * Implements hook_enable().
  *
  * Notify content module when this module is enabled.
  */
@@ -28,7 +34,7 @@ function game_clock_field_enable() {
 }
 
 /**
- * Implementation of hook_disable().
+ * Implements hook_disable().
  *
  * Notify content module when this module is disabled.
  */

@@ -5,5 +5,12 @@ dependencies[] = text
 dependencies[] = optionwidgets
 dependencies[] = game_clock
 package = Game
-core = 6.x
+core = 7.x
+
+
+; Information added by drupal.org packaging script on 2011-02-25
+version = "6.x-1.x-dev"
+core = 7.x
+project = "game_clock"
+datestamp = "1298619320"
 

@@ -68,5 +68,5 @@ function _game_clock_help($section) {
   hook_game_clock_delete(\$clock = 'default', \$state = NULL);
 </pre>
     <p>Please read the documentation in the game_clock.module file for more information.</p>
-", array('!game_clock' => l(t('Game Clock administration'), 'admin/settings/game_clock')));
+", array('!game_clock' => l(t('Game Clock administration'), 'admin/config/game_clock')));
 }
