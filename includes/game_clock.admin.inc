@@ -29,7 +29,7 @@ function game_clock_list_page() {
   }
   dpm($output);
   return $output;*/
-  dpm($build);
+  //dpm($build);
   return $build;
   // print drupal_render(drupal_get_form
   //drupal_render($build);
@@ -63,36 +63,41 @@ function game_clock_list_form($form, $form_state) {
 
   $game_clocks = array();
   // TODO Please change this theme call to use an associative array for the $variables parameter.
-  $header = array(
+  $header_row = array(
     //theme('table_select_header_cell'),
         //theme('table_select_header_cell'), deprecaed in 6
 
     array(
       'data' => t('Title'),
-      'field' => 'title',
+      'field' => 'g.title',
       'sort' => 'asc',
     ),
     array(
+      'data' => t('Name'),
+      'field' => 'g.name',
+    ),
+    array(
       'data' => t('Type'),
-      'field' => 'type',
+      'field' => 'g.type',
     ),
     array(
       'data' => t('Status'),
-      'field' => 'status',
+      'field' => 'g.status',
     ),
     array(
       'data' => t('Turn'),
-      'field' => 'turn',
+      'field' => 'g.turn',
     ),
     array(
       'data' => t('Increment'),
-      'field' => 'increment',
+      'field' => 'g.increment',
     ),
     array(
       'data' => t('Page load'),
-      'field' => 'init',
+      'field' => 'g.init',
     ),
-    t('Ops'),
+    //t('Ops'),
+    //t('ops'),
   );
   
   $rows = array();
@@ -101,16 +106,14 @@ function game_clock_list_form($form, $form_state) {
   $query
     ->extend('TableSort') // see
     // http://api.drupal.org/api/drupal/includes!tablesort.inc/class/TableSort/7
-    ->fields('g', array('title', 'type', 'status', 'turn', 'increment', 'init', ))
-    ->orderByHeader($header);
-  //$sql = "SELECT * FROM {game_clocks}";
+    ->fields('g', array('title', 'name', 'type', 'status', 'turn', 'increment', 'init', ))
+    ->orderByHeader($header_row);
+ 
+ //$sql = "SELECT * FROM {game_clocks}";
   //$sql .= tablesort_sql($header);
   // http://nanwich.com/node/335
   // TODO: what does this thing do?
   // game_clock_settings_form_count limits the number of clocks, default 50
-
-  
-  
   //$sql = "SELECT * FROM {game_clocks}";
   //$sql .= tablesort_sql($header);
   if (variable_get('game_clock_settings_form_count', 50)) {
@@ -122,15 +125,20 @@ function game_clock_list_form($form, $form_state) {
     $results = $query->execute();
   //$results = db_query($sql);
   }
+  dpm($results);
+  dpm($results->fetchObject());
   while ($clock = $results->fetchObject()) {
   //was while ($clock = db_fetch_object($results)) {
     $game_clocks[$clock->name] = $clock;
+    //$game_clocks[$clock->title] = $clock;
+    dpm($clock);
   }
+
 
   $form = array();
   $form['table_header'] = array(
     '#type' => 'value',
-    '#value' => $header,
+    '#value' => $header_row,
   );
   $options = array(
     'pause' => t('Pause game clocks'),
@@ -160,6 +168,10 @@ function game_clock_list_form($form, $form_state) {
       '#type' => 'item',
       '#value' => l(t('@title', array('@title' => $state->title)), 'admin/config/game_clock/' . $clock),
     );
+    $form['clocks'][$clock]['name'] = array(
+      '#type' => 'item',
+      '#value' => t('@name', array('@name' => $state->name)),
+    );
     $form['clocks'][$clock]['type'] = array(
       '#type' => 'item',
       '#value' => t('@type', array('@type' => $state->type)),
@@ -180,13 +192,13 @@ function game_clock_list_form($form, $form_state) {
       '#type' => 'item',
       '#value' => t('@init', array('@init' => ($state->init ? t('Yes') : t('No')))),
     );
-    $ops = array(
+    /*$ops = array(
       l(t('edit'), 'admin/config/game_clock/' . $clock),
       l(t('pause'), 'admin/config/game_clock/' . $clock . '/pause'),
       l(t('start'), 'admin/config/game_clock/' . $clock . '/start'),
       l(t('reset'), 'admin/config/game_clock/' . $clock . '/reset'),
       l(t('delete'), 'admin/config/game_clock/' . $clock . '/delete'),
-    );
+    );*/
     $form['clocks'][$clock]['ops'] = array(
       '#type' => 'item',
       '#value' => implode(', ', $ops),
@@ -209,6 +221,7 @@ function game_clock_list_form($form, $form_state) {
  * @see http://drupal.org/node/1354
  */
 function game_clock_list_form_submit($form, &$form_state) {
+  drupal_set_message("ADMIN224 game_clock_list_form_submit");
   $clocks = array();
   foreach ($form_state['values']['clocks'] as $clock => $value) {
     if ($value['selection']) {
@@ -364,44 +377,45 @@ function game_clock_form($form, $form_state, $clock = NULL) {
     '#type' => 'fieldset',
     '#title' => !isset($clock->cid) ? t('Create new game clock') : t('Game clock'),
     '#collapsible' => !isset($clock->cid) && (arg(3) != 'add'),
-    '#collapsed' => !isset($clock->cid) && (arg(3) != 'add'),
+    '#collapsed' => FALSE,
+    //'#collapsed' => !isset($clock->cid) && (arg(3) != 'add'),
     '#description' => t('Game clocks can be useful for tracking game turns, special effects, and the like. You can also create clocks programmatically. See the !help page for more information.', array('!help' => l('game clock help', 'admin/help/game_clock'))),
   );
   $form['clock']['name'] = array(
     '#type' => 'textfield',
-    '#title' => t('Name'),
+    '#title' => t('Name:'),
     '#required' => TRUE,
     '#description' => t('A unique machine name for this game clock. It must contain only lower-case, alphanumeric characters and underscores, and begin with a letter.'),
     '#default_value' => isset($clock->name) ? $clock->name : '',
   );
   $form['clock']['title'] = array(
     '#type' => 'textfield',
-    '#title' => t('Title'),
+    '#title' => t('Title:'),
     '#description' => t('A human readable title for this game clock.'),
     '#default_value' => isset($clock->title) ? $clock->title : '',
     '#required' => TRUE,
   );
   $form['clock']['type'] = array(
     '#type' => 'textfield',
-    '#title' => t('Type'),
+    '#title' => t('Type:'),
     '#description' => t('The optional type of the game clock. This is useful for sorting and filtering game clocks on the listing page. Additionally, some modules may act on or affect only clocks of this type.'),
     '#default_value' => isset($clock->type) ? $clock->type : '',
   );
   $form['clock']['status'] = array(
     '#type' => 'checkbox',
-    '#title' => t('Start clock'),
+    '#title' => t('Start clock immediately'),
     '#description' => t('If checked, then this game clock will begin started. Otherwise, it will be paused.'),
     '#default_value' => isset($clock->status) ? $clock->status : TRUE,
   );
   $form['clock']['turn'] = array(
     '#type' => 'textfield',
-    '#title' => t('Starting turn'),
+    '#title' => t('Starting turn:'),
     '#default_value' => isset($clock->turn) ? $clock->turn : 0,
     '#description' => t('What turn should the clock begin at?'),
   );
   $form['clock']['increment'] = array(
     '#type' => 'select',
-    '#title' => t('Increment'),
+    '#title' => t('Increment:'),
     '#options' => _game_clock_selections(),
     '#default_value' => isset($clock->increment) ? $clock->increment : variable_get('game_clock_increment_default', 5),
     '#required' => TRUE,
@@ -419,20 +433,27 @@ function game_clock_form($form, $form_state, $clock = NULL) {
     '#default_value' => isset($clock->init) ? $clock->init : TRUE,
     '#description' => 'If checked, then this clock will be checked for incrementation on normal page loads. Otherwise, it will only be checked during a cron run. If a clock has an increment value higher than the cron settings, it may be useful to check this box.',
   );
+  $valuecid = "";
+  if (isset($clock->cid)) {
+    $valuecid = (string) $clock->cid;
+  }
+
+  $form['clock']['cid'] = array(
+  // adding this as a textfield to get the show in the road
+        '#title' => t('CID clock ID # should be unique'),
+    '#type' => 'textfield',
+    //'#type' => 'value',
+//    '#value' => $valuecid, // $clock->cid,
+    '#default_value' => $valuecid, // $clock->cid,
+  );
+
   $form['clock']['submit'] = array(
     '#type' => 'submit',
     '#value' => isset($clock->cid) ? t('Save changes') : t('Create clock'),
   );
   
-  $valuecid = "";
-  if (isset($clock->cid)) {
-    $valuecid = (string) $clock->cid;
-  }
+
   
-  $form['clock']['cid'] = array(
-    '#type' => 'value',
-    '#value' => $valuecid, // $clock->cid,
-  );
   return $form;
 }
 
@@ -490,7 +511,7 @@ function game_clock_settings() {
  *  @see game_clock_form
  */
 function game_clock_form_validate($form, &$form_state) {
-  drupal_set_message('ADMIN493 game_clock_form_validate CALLED ');
+  drupal_set_message('ADMIN500 game_clock_form_validate CALLED ');
 
   dpm($form);
   dpm($form_state);
@@ -502,23 +523,28 @@ function game_clock_form_validate($form, &$form_state) {
   }
   else {
     // Ensure the machine name is unique.
-      drupal_set_message('ADMIN504 CHECKIGN $ test_state game_clock_state with that NAME ');
+      drupal_set_message('ADMIN507 dupe checking via $ test_state game_clock_state w NAME '. $state['name']);
+    // fires game_clock_state to see if a diff name is in there
     $test_state = game_clock_state($state['name']);
-      drupal_set_message('ADMIN506 game_clock_state RETURNED in game_clock_form_validate');
+      drupal_set_message('ADMIN509 game_clock_state RETURNED in game_clock_form_validate');
     // TODO what's up with this CID THING? DF
     if (isset($test_state->cid) && $test_state->cid && ($test_state->cid != $state['cid'])) {
-      drupal_set_message('ADMIN509 (isset($ test_state->cid) && $ test_state->cid && ($ test_state->cid != $state[cid])) RETURNS TRUE');
+      drupal_set_message('ADMIN512 (isset($ test_state->cid) && $ test_state->cid && ($ test_state->cid != $state[cid])) RETURNS TRUE');
 
       form_set_error('name', t('Game clock names must be unique. This game clock name is already in use.'));
+    } else {
+      drupal_set_message('ADMIN522 game_clock_state dupe name not found RETURNS ok');
     }
   }
   if (isset($state['cid'])) {
-    drupal_set_message("ADMIN509 if (isset($ state['cid'])) is true");
+    drupal_set_message("ADMIN526 (isset($ state['cid'])) is true");
+    //
+        drupal_set_message("ADMIN528 fires game_clock_state(state['cid'] with is_cid=true)");
     $test_state = game_clock_state($state['cid'], TRUE);
     if (!isset($test_state->cid)) {
-          drupal_set_message("ADMIN512  if (!isset($ test_state->cid))  is true");
-
-      form_set_error('', t('This game clock has been deleted.'));
+          drupal_set_message("ADMIN531  !isset test_state->cid))  is true");
+// TODO fix WTF all this fail is about. this always is true
+// form_set_error('', t('ADMIN533 This game clock has been deleted.'));
     }
   }
 }
@@ -528,16 +554,21 @@ function game_clock_form_validate($form, &$form_state) {
  *  @see game_clock_form
  */
 function game_clock_form_submit($form, &$form_state) {
+  dpm($form_state['values']);
+  drupal_set_message("ADMIN546  game_clock_form_submit CALLED");
   if (isset($form_state['values']['cid'])) {
-    // Get the currently stored state.
+    drupal_set_message("ADMIN560 game_clock_form_submit isset($ form_state['values']['cid'] TRUE");
+    // Get the currently stored state from form into $state.
     $state = game_clock_state($form_state['values']['cid'], TRUE);
 
     // Store the old name, so we can redirect if it's changed.
-    $old_name = $state->name;
-
+    if (isset($state->name)) {
+        drupal_set_message("ADMIN566 game_clock_form_submit isset(state name" . $state->name);
+      $old_name = $state->name;
+    }
     // Only save if the state is already in the database.
     // This should already be taken care of in the validation step.
-    if ($state->cid) {
+    if (isset($state->cid) && $state->cid) {
       // By calling array_merge, we replace the $state with the new values.
       $state = array_merge((array) $state, $form_state['values']);
 
@@ -553,7 +584,8 @@ function game_clock_form_submit($form, &$form_state) {
     }
   }
   else {
-    // Create a new game clock state.
+    // Create a new game clock state. FINALLY
+    drupal_set_message("ADMIN589  game_clock_create call for " . $state->name);
     $state = game_clock_create($form_state['values'], TRUE);
   }
 }

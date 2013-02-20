@@ -8,6 +8,7 @@
  *  It will also optionally check on page loads, useful for fast turns on busy
  *  sites.
  */
+// TODO - create an error / debug switch function whcih is a passthru for drupal_set_message
 
 /**
  * Implements hook_help().
@@ -82,6 +83,8 @@ function game_clock_start($clock = 'default') {
  *    incremented.
  */
 function game_clock_increment($clock = 'default', $force = FALSE) {
+    dd("here's the thing game_clock_increment", "activity");
+
   drupal_set_message('85 game_clock_increment CALLED ');
   $state = game_clock_state($clock);
   // If the clock is paused or doesn't exist, then return.
@@ -233,9 +236,10 @@ function game_clock_save($state, $report_errors = FALSE) {
  *    state asked for.
  */
 function game_clock_state($clock = NULL, $is_cid = NULL) {
+  dd("game clock state", 'activity');
   global $game_clocks;
-  drupal_set_message('233 GAMECLOCKSTATE CALLED ');
-  drupal_set_message('234 the clock is $clock ' . $clock);
+  drupal_set_message('241 game_clock_state CALLED ');
+  drupal_set_message('242 game_clock_state the clock is $clock= ' . $clock);
   dpm($game_clocks);
   dpm($clock);
   dpm($is_cid);
@@ -244,7 +248,7 @@ function game_clock_state($clock = NULL, $is_cid = NULL) {
     $game_clocks = array();
   }
   if (!isset($clock)) {
-    drupal_set_message('242 no clock at game clock state');
+    drupal_set_message('251 no clock at game_clock_state, so iterating to load return $ game_clocks');
     $game_clocks = array();
     $results = db_query('SELECT * FROM {game_clocks}');
     // TODO needs to be patched database for D7 ^
@@ -257,32 +261,36 @@ function game_clock_state($clock = NULL, $is_cid = NULL) {
 
   // If we've been passed an object, then we'll simply use its cid.
   if (is_object($clock)) {
-    drupal_set_message('255 game clock state got $clock object');
+    drupal_set_message('255 game_clock_state got $clock object');
     $clock = $clock->cid;
     $is_cid = TRUE;
   }
 
   // If we don't specify, we try to determine if we were passed a number.
   if (!isset($is_cid)) {
-      drupal_set_message('262 game clock state got $clock object w.o cid');
-    $is_cid = is_numeric($clock);
+      drupal_set_message('271 game_clock_state got $clock object w.o is_cid numer=' . is_numeric($clock));
+    $is_cid = is_numeric($clock); // TODO < whuts this stuff do?
   }
 
   if ($is_cid) {
-      drupal_set_message('267 game clock state got $is_cid true');
-
+    drupal_set_message('276 game_clock_state got $is_cid true');
     foreach ($game_clocks as $name => $state) {
       if ($state->cid == $clock) {
+        drupal_set_message('280 game_clock_state return $state');
         return $state;
       }
     }
         //$result = db_query("SELECT * FROM {game_clocks} WHERE cid = %d", array($clock))->fetchObject();
-        $result = db_query("SELECT * FROM {game_clocks} WHERE cid = :cid", array(':cid' => $clock));
+    $result = db_query("SELECT * FROM {game_clocks} WHERE cid = :cid", array(':cid' => $clock));
     //WAS $result = db_fetch_object(db_query("SELECT * FROM {game_clocks} WHERE cid = :cid", array(':cid' => $clock)));
     if (isset($result->cid) && $result->cid) {
+      drupal_set_message('283 game_clock_state if (isset($ result->cid) && $ result->cid)');
       $game_clocks[$result->name] = $result;
+      drupal_set_message('283 game_clock_state return $ result');
+
       return $result;
     }
+    drupal_set_message('293 game_clock_state RETURN ZILCH upon $is_cid true');
     return;
   }
 
@@ -292,22 +300,32 @@ function game_clock_state($clock = NULL, $is_cid = NULL) {
       $game_clocks[$result->name] = $result;
     }
   }*/
-      drupal_set_message('290 game clock state finally to sql');
-
+      drupal_set_message('296 game_clock_state finally to sql');
+// todo fix this query to PDO
     $sql = db_query('SELECT * FROM {game_clocks} WHERE name = :clock_name', array(
    ':clock_name' => $clock));
-       drupal_set_message('294 $sql = ' . var_dump($sql));
+    drupal_set_message('300 $ sql = ' . $sql->queryString);
 
     // end patch d7 db
     while ($result = db_query($sql)->fetchObject()) {
     //while ($result = db_fetch_object($results)) {
       $game_clocks[$result->name] = $result;
-    }
-  dpm($game_clocks[$clock]);
-      drupal_set_message('302 game clock state lets retunr $game_clocks[$clock]' . $game_clocks);
-
-  return $game_clocks[$clock];
+    } // TODO should be result>title ?? 
+  if (isset($game_clocks[$clock])) { 
+    dpm($game_clocks[$clock]);
+    drupal_set_message('316 game_clock_state returning $game_clocks[$clock]') . $game_clocks;
+    return $game_clocks[$clock];
   //TODO Undefined index: testname in game_clock_state() 
+  }
+  elseif (isset($game_clocks)) {
+    drupal_set_message('321 game_clock_state returning $game_clocks w.o [$clock]');
+    return $game_clocks;
+  }
+  else {
+    drupal_set_message('325 game_clock_state returning $game_clocks w.o [$clock]');
+
+    return;
+  }
 }
 
 /**
@@ -325,6 +343,7 @@ function game_clock_type_states($type = '') {
   $results = db_query("SELECT * FROM {game_clocks} WHERE type = :type", array(':type' => $type));
   while ($state = db_fetch_object($results)) {
     $game_clocks[$state->name] = $clocks[$state->name] = $state;
+    // TODO should be -> title??
   }
 
   return $clocks;
@@ -348,6 +367,7 @@ function game_clock_current_turn($clock = 'default') {
  */
 function game_clock_init() {
   global $game_clocks;
+  drupal_set_message("game_clock_init fires");
   $tableok = FALSE;
   if (db_table_exists("game_clocks")) {
     $tableok = TRUE;
@@ -371,8 +391,9 @@ function game_clock_init() {
       $results = db_query($sql, array(':current_time' => REQUEST_TIME)); // FIXED
   }
   while ($result = $results->fetchObject()) {
-    $game_clocks[$result->name] = $result;
-    game_clock_increment($result->name);
+    $game_clocks[$result->name] = $result; // TODO should be -> TITLE ??
+    drupal_set_message("game_clock_init iterates results");
+    game_clock_increment($result->name); // TODO should be -> TITLE ??
   }
 }
 
@@ -380,19 +401,25 @@ function game_clock_init() {
  * Implements hook_cron().
  */
 function game_clock_cron() {
+  drupal_set_message("game_clock_cron fires");
   global $game_clocks;
-  $sql = "SELECT * FROM {game_clocks} WHERE status <> 0 AND increment > 0 AND next_tick < %d ORDER BY next_tick";
+  $sql = db_query("SELECT * FROM {game_clocks} WHERE status <> 0 AND increment > 0 AND next_tick < :current_time",
+      array(':current_time' => PASS_THROUGH, ));
+
   if ($limit = variable_get('game_clock_limit_on_cron', 0)) {
+    $results = db_query_range($sql, 0, $limit);
+
     // TODO Please convert this statement to the D7 database API syntax.
-    $results = db_query_range($sql);
+//    $results = db_query_range($sql);
   }
   else {
     // TODO Please convert this statement to the D7 database API syntax.
-    $results = db_query($sql, REQUEST_TIME);
+    //$results = db_query($sql, REQUEST_TIME);
+      $results = db_query($sql, array(':current_time' => REQUEST_TIME));
   }
-  while ($result = db_fetch_object($results)) {
-    $game_clocks[$result->name] = $result;
-    game_clock_increment($result->name);
+  while ($result = $results->fetchObject()) {
+    $game_clocks[$result->name] = $result;// TODO should be -> TITLE ??
+    game_clock_increment($result->name);// TODO should be -> TITLE ??
   }
 }
 
@@ -400,6 +427,7 @@ function game_clock_cron() {
  * Implements hook_menu().
  */
 function game_clock_menu() {
+  drupal_set_message("game_clock_menu fires");
   module_load_include('inc', 'game_clock', 'includes/game_clock.menu');
   return _game_clock_menu();
 }
@@ -433,10 +461,12 @@ function game_clock_permission() {
 }
 
 /**
- * Implements hook_block_info().
+ * Implements hook_block_info(). This gets called in cache_clear
  */
 function game_clock_block_info() {
-  drupal_set_message('408 game_clock_block_info CALLED ');
+    dd("here's the thing game_clock_block_info", "label");
+
+  drupal_set_message('446 game_clock_block_info CALLED '); dd('446 game_clock_block_info CALLED ');
   $blocks = array();
   
   foreach (game_clock_state() as $game => $state) {
